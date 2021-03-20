@@ -22,13 +22,6 @@ public class EventRequest<S extends Settings, C extends Context> {
   String startDate;
   Integer errorPartition;
   S settings;
-  String userName;
-  String password;
-  String tableName;
-  String jdbcUrl;
-  String partition;
-  String fetchSize;
-  String syncPolicy;
   C context;
 
   public String getWfFlowId() {
@@ -133,62 +126,6 @@ public class EventRequest<S extends Settings, C extends Context> {
 
   public void setSettings(S settings) {
     this.settings = settings;
-  }
-
-  public String getUserName() {
-    return userName;
-  }
-
-  public void setUserName(String userName) {
-    this.userName = userName;
-  }
-
-  public String getPassword() {
-    return password;
-  }
-
-  public void setPassword(String password) {
-    this.password = password;
-  }
-
-  public String getTableName() {
-    return tableName;
-  }
-
-  public void setTableName(String tableName) {
-    this.tableName = tableName;
-  }
-
-  public String getJdbcUrl() {
-    return jdbcUrl;
-  }
-
-  public void setJdbcUrl(String jdbcUrl) {
-    this.jdbcUrl = jdbcUrl;
-  }
-
-  public String getPartition() {
-    return partition;
-  }
-
-  public void setPartition(String partition) {
-    this.partition = partition;
-  }
-
-  public String getFetchSize() {
-    return fetchSize;
-  }
-
-  public void setFetchSize(String fetchSize) {
-    this.fetchSize = fetchSize;
-  }
-
-  public String getSyncPolicy() {
-    return syncPolicy;
-  }
-
-  public void setSyncPolicy(String syncPolicy) {
-    this.syncPolicy = syncPolicy;
   }
 
   public C getContext() {

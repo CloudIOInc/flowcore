@@ -188,7 +188,7 @@ public class OracleSubTask2 implements Runnable {
       logger.debug("Starting task: {}", topicPartition.toString());
     }
     future = new CompletableFuture<Boolean>();
-    IO.execute(this);
+    KafkaUtil.execute(this);
     return future;
   }
 }

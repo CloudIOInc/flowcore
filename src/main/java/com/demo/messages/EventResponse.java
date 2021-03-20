@@ -10,8 +10,8 @@ public class EventResponse<C> {
   String wfNodeId;
   String wfNodeInstanceId;
   String status;
-  Map<String, Integer> startOffset;
-  Map<String, Integer> endOffset;
+  Map<Integer, Integer> startOffset;
+  Map<Integer, Integer> endOffset;
   String statusMessage;
   String toTopic;
   Date startDate;
@@ -57,19 +57,19 @@ public class EventResponse<C> {
     this.status = status;
   }
 
-  public Map<String, Integer> getStartOffset() {
+  public Map<Integer, Integer> getStartOffset() {
     return startOffset;
   }
 
-  public void setStartOffset(Map<String, Integer> startOffset) {
+  public void setStartOffset(Map<Integer, Integer> startOffset) {
     this.startOffset = startOffset;
   }
 
-  public Map<String, Integer> getEndOffset() {
+  public Map<Integer, Integer> getEndOffset() {
     return endOffset;
   }
 
-  public void setEndOffset(Map<String, Integer> endOffset) {
+  public void setEndOffset(Map<Integer, Integer> endOffset) {
     this.endOffset = endOffset;
   }
 

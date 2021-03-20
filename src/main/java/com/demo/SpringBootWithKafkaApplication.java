@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 
-import com.demo.input.IO;
+import com.demo.input.KafkaUtil;
 
 @SpringBootApplication
 @EnableAutoConfiguration(exclude = DataSourceAutoConfiguration.class)
@@ -14,6 +14,6 @@ public class SpringBootWithKafkaApplication {
 
   public static void main(String[] args) throws Exception {
     SpringApplication.run(SpringBootWithKafkaApplication.class, args);
-    IO.start();
+    KafkaUtil.start();
   }
 }

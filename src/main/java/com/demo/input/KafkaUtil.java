@@ -17,10 +17,14 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
@@ -35,7 +39,9 @@ import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.connect.util.TopicAdmin;
@@ -43,6 +49,7 @@ import org.apache.kafka.connect.util.TopicAdmin.NewTopicBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.demo.events.BaseConsumer;
 import com.demo.util.GsonBigDecimalAdapter;
 import com.demo.util.GsonUTCDateAdapter;
 import com.google.common.util.concurrent.Monitor;
@@ -52,14 +59,14 @@ import com.google.gson.GsonBuilder;
 import io.cloudio.scale.kafka.eventbus.IOExecutor;
 import io.cloudio.scale.kafka.eventbus.IOThreadFactory;
 
-public class IO {
+public class KafkaUtil {
   private static final String NINETY_ONE_DAYS_MS = "7862400000";
   static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
   private static IOExecutor executor = null;
   private static ScheduledThreadPoolExecutor kafkaExecutor = null;
   private static Gson gsonMessageDeserializer, gsonDeserializer, gsonSerializerSkipNulls, gsonSerializer,
       gsonMessageSerializer, gsonPrettySerializer;
-  static Logger logger = LogManager.getLogger(IO.class);
+  static Logger logger = LogManager.getLogger(KafkaUtil.class);
   private static ScheduledThreadPoolExecutor statusScheduler;
   static volatile boolean started = false;
   public static final Charset UTF8 = StandardCharsets.UTF_8;
@@ -289,29 +296,35 @@ public class IO {
     return AdminClient.create(properties);
   }
 
-  //  private void createTopic(String topic, int topicPartition, short topicReplica) throws Exception {
-  //    try {
-  //      List<NewTopic> newTopics = new ArrayList<NewTopic>();
-  //      final AdminClient adminClient = getAdminClient();
-  //      NewTopicBuilder topicBuilder = TopicAdmin
-  //          .defineTopic(topic)
-  //          .partitions(topicPartition)
-  //          .replicationFactor((short) topicReplica);
-  //      NewTopic newTopic = topicBuilder.build();
-  //      logger.info("Creating topic - " + newTopic.toString());
-  //      newTopics.add(newTopic);
-  //      CreateTopicsResult result = adminClient.createTopics(newTopics);
-  //      result.all().get();
-  //    } catch (Exception e) {
-  //      if (e instanceof TopicExistsException || e.getCause() instanceof TopicExistsException) {
-  //        // ignore me
-  //        logger.info("Topic already exists - " + topic);
-  //        return;
-  //      } else {
-  //        logger.catching(e);
-  //      }
-  //      throw e;
-  //    }
-  //  }
+  public static Map<Integer, Integer> getEndOffsets(String topicName, String groupId, int topicPartition) {
+    Properties consumerProps = BaseConsumer.getProperties(groupId);
+    Map<Integer, Integer> offsetMap = new HashMap<Integer, Integer>();
+    try (KafkaConsumer<String, String> list = new KafkaConsumer<>(consumerProps)) {
+      // First, check if the topic exists in the list of all topics
+      // First, check if the topic exists in the list of all topics
+      Map<String, List<PartitionInfo>> topics = list.listTopics();
+      List<PartitionInfo> partitionInfos = topics.get(topicName);
+      if (partitionInfos == null) {
+        logger.warn("Partition information was not found for topic {}", topicName);
+        return null;
+      } else {
+        Collection<TopicPartition> partitions = new ArrayList<>();
+        for (PartitionInfo partitionInfo : partitionInfos) {
+          TopicPartition partition = new TopicPartition(topicName, partitionInfo.partition());
+          partitions.add(partition);
+        }
+        Map<TopicPartition, Long> endingOffsets = list.endOffsets(partitions);
+        Set<Entry<TopicPartition, Long>> offsets = endingOffsets.entrySet();
+        for (Entry<TopicPartition, Long> of : offsets) {
+          Long endOffset = of.getValue();
+          int epartition = of.getKey().partition();
+          offsetMap.put(epartition, endOffset.intValue());
+        }
+      }
+
+    }
+
+    return offsetMap;
+  }
 
 }

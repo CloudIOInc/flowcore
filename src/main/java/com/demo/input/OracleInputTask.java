@@ -8,6 +8,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.sql.DataSource;
@@ -18,19 +19,17 @@ import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
-import com.demo.events.TaskEventConsumer.EventType;
-import com.demo.messages.Message;
-import com.demo.messages.ResponseMessage;
-import com.demo.messages.TaskEvent;
+import com.demo.messages.OracleInputEventRequest;
+import com.demo.messages.OracleInputEventResponse;
 import com.demo.messages.Topics;
 
 @Service
-public class OracleInputTask implements InputTask {
+public class OracleInputTask {
 
   @Autowired
   private KafkaTemplate<String, String> kafkaTemplate;
 
-  TaskEvent message;
+  OracleInputEventRequest request;
 
   @Value(value = "${topic.partition}")
   private int topicPartition;
@@ -46,26 +45,25 @@ public class OracleInputTask implements InputTask {
 
   private Logger logger = Logger.getLogger("OracleSubTask");
 
-  @Override
   public String getSQL() {
-    return "Select COUNT(1) ROW_COUNT from " + message.getInputSettings().getObjectName();
+    return "Select COUNT(1) ROW_COUNT from " + request.getSettings().getTableName();
   }
 
-  @Override
-  public void execute(TaskEvent message) {
-    this.message = message;
+  public void execute(OracleInputEventRequest request) {
+    this.request = request;
     long stime = new Date().getTime();
     try {
       String topicName = "oralce_input_task_topic";
-      IO.createTopic(IO.getAdminClient(), topicName, topicPartition, false);
+      KafkaUtil.createTopic(KafkaUtil.getAdminClient(), topicName, topicPartition, false);
       //create data topic
-      String dtTopic = message.getDataTopic();
-      IO.createTopic(IO.getAdminClient(), dtTopic, topicPartition, false);
-      executeInternal(message, topicName);
+      String toTopic = request.getToTopic();
+      KafkaUtil.createTopic(KafkaUtil.getAdminClient(), toTopic, topicPartition, false);
+      executeInternal(request, topicName);
       //  postEvent(message, totalRows);
-      DataSource ds = getDataSource(message);
+      DataSource ds = getDataSource(request);
       OracleInputTaskConsumer inputConsumer = new OracleInputTaskConsumer(ds);
-      IO.executeOnKafkaScheduler(inputConsumer);
+      KafkaUtil.executeOnKafkaScheduler(inputConsumer);
+      postEvent(request);
     } catch (Exception e) {
       logger.severe("Failed to execute OracleInputTask" + e.getMessage());
     }
@@ -73,23 +71,25 @@ public class OracleInputTask implements InputTask {
     logger.info("total time to load data in Kafka topic is " + (etime - stime) / 1000 + " seconds");
   }
 
-  private void executeInternal(TaskEvent message, String topic) {
-    DataSource ds = getDataSource(message);
+  private void executeInternal(OracleInputEventRequest request, String topic) {
+    DataSource ds = getDataSource(request);
     List<OracleBatchInfo> batchInfoList = getBatchDetails(ds);
     for (OracleBatchInfo batchInfo : batchInfoList) {
       kafkaTemplate.send(topic, batchInfo.toString());
     }
-
-    postEvent(message);
   }
 
-  private void postEvent(Message message) {
-    ResponseMessage response = new ResponseMessage();
-    response.setEventType(EventType.Response.name());
-    // response.setInputCount(totalRows);
-    response.setWfFlowId(message.getWfFlowId());
-    response.setWfFlowInstanceId(message.getWfFlowInstanceId());
+  private void postEvent(OracleInputEventRequest request) {
+    OracleInputEventResponse response = new OracleInputEventResponse();
+    response.setEndOffset(null);
+    response.setStartOffset(null);
+    response.setStatus("RUNNING");
 
+    // response.setInputCount(totalRows);
+    response.setWfFlowId(request.getWfFlowId());
+    response.setWfFlowInstanceId(request.getWfFlowInstanceId());
+    Map<Integer, Integer> endOffsets = KafkaUtil.getEndOffsets(request.getToTopic(), groupId, topicPartition);
+    response.setEndOffset(endOffsets);
     kafkaTemplate.send(Topics.EVENT_TOPIC, response.toString());
   }
 
@@ -102,7 +102,7 @@ public class OracleInputTask implements InputTask {
     Connection conn = null;
     try {
       conn = ds.getConnection();
-      String objectName = message.getInputSettings().getObjectName();
+      String objectName = request.getSettings().getTableName();
       String sql = getSQL();
       stmt = conn.createStatement();
       rs = stmt.executeQuery(sql);
@@ -110,7 +110,7 @@ public class OracleInputTask implements InputTask {
       while (rs.next()) {
         count = rs.getLong("ROW_COUNT");
       }
-      long partition = message.getInputSettings().getPartition();
+      long partition = request.getSettings().getPartition();
       if (count > partition) {
         long remainder = count % partition;
 
@@ -152,12 +152,12 @@ public class OracleInputTask implements InputTask {
     return batchInfo;
   }
 
-  public DataSource getDataSource(TaskEvent message) {
+  public DataSource getDataSource(OracleInputEventRequest message) {
     DataSourceBuilder dataSourceBuilder = DataSourceBuilder.create();
     dataSourceBuilder.driverClassName("oracle.jdbc.driver.OracleDriver");
-    dataSourceBuilder.url(message.getInputSettings().getBaseUrl());
-    dataSourceBuilder.username(message.getInputSettings().getUserName());
-    dataSourceBuilder.password(message.getInputSettings().getPassword());
+    dataSourceBuilder.url(message.getSettings().getJdbcUrl());
+    dataSourceBuilder.username(message.getSettings().getUserName());
+    dataSourceBuilder.password(message.getSettings().getPassword());
     return dataSourceBuilder.build();
   }
 

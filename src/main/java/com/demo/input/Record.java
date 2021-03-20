@@ -854,7 +854,7 @@ public class Record extends TreeMap<String, Object> {
 
   @Override
   public final String toString() {
-    return IO.getSerializer().toJson(this);
+    return KafkaUtil.getSerializer().toJson(this);
   }
 
   public Record with(Record m) {
