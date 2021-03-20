@@ -1,0 +1,186 @@
+
+{
+    "employee":[],
+	"RA_OBJECT_ATTRIBUTES": [
+		{
+			"fieldName": "MAX_LENGTH",
+			"type": "NUMBER",
+			"length": 0
+		},
+		{
+			"fieldName": "ATTRIBUTE_TYPE",
+			"type": "VARCHAR2",
+			"length": 30
+		},
+		{
+			"fieldName": "QUERY_ALLOWED",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "ALLOW_BLANK",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "LAST_UPDATED_BY",
+			"type": "NUMBER",
+			"length": 0
+		},
+		{
+			"fieldName": "LAST_UPDATE_DATE",
+			"type": "DATE",
+			"length": 0
+		},
+		{
+			"fieldName": "CREATED_BY",
+			"type": "NUMBER",
+			"length": 0
+		},
+		{
+			"fieldName": "CREATION_DATE",
+			"type": "DATE",
+			"length": 0
+		},
+		{
+			"fieldName": "AUTO_SEQUENCE",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "PRIMARY_KEY",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "EXPORT_ALLOWED",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "SELECT_ALLOWED",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "UPDATE_ALLOWED",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "INSERT_ALLOWED",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "ATTRIBUTE_NAME",
+			"type": "VARCHAR2",
+			"length": 120
+		},
+		{
+			"fieldName": "IS_PASSWORD",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "FIELD_LABEL",
+			"type": "VARCHAR2",
+			"length": 120
+		},
+		{
+			"fieldName": "GROUP_NAME",
+			"type": "VARCHAR2",
+			"length": 30
+		},
+		{
+			"fieldName": "SUB_TYPE",
+			"type": "VARCHAR2",
+			"length": 40
+		},
+		{
+			"fieldName": "ORG_ID",
+			"type": "NUMBER",
+			"length": 0
+		},
+		{
+			"fieldName": "ATTRIBUTE_NAME_ORIG",
+			"type": "VARCHAR2",
+			"length": 60
+		},
+		{
+			"fieldName": "OBJECT_UID",
+			"type": "VARCHAR2",
+			"length": 40
+		},
+		{
+			"fieldName": "ATTRIBUTE_UID",
+			"type": "VARCHAR2",
+			"length": 40
+		},
+		{
+			"fieldName": "GROUPING_SET_SEQ",
+			"type": "NUMBER",
+			"length": 0
+		},
+		{
+			"fieldName": "NO_UPPERCASE_SEARCH",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "VERSION_ID",
+			"type": "NUMBER",
+			"length": 0
+		},
+		{
+			"fieldName": "CALCULATED_COLUMN",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "ENTITY_TYPE",
+			"type": "VARCHAR2",
+			"length": 30
+		},
+		{
+			"fieldName": "SCALE",
+			"type": "NUMBER",
+			"length": 0
+		},
+		{
+			"fieldName": "AUDIT_ENABLED",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "OUT_PARAM",
+			"type": "VARCHAR2",
+			"length": 1
+		},
+		{
+			"fieldName": "PARAM_NAME",
+			"type": "VARCHAR2",
+			"length": 30
+		},
+		{
+			"fieldName": "COLUMN_NAME",
+			"type": "VARCHAR2",
+			"length": 4000
+		},
+		{
+			"fieldName": "DEFAULT_VALUE",
+			"type": "VARCHAR2",
+			"length": 30
+		},
+		{
+			"fieldName": "END_DATE",
+			"type": "DATE",
+			"length": 0
+		},
+		{
+			"fieldName": "START_DATE",
+			"type": "DATE",
+			"length": 0
+		}
+	]
+}
