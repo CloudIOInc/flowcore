@@ -14,7 +14,7 @@ import com.demo.messages.Record;
 import com.demo.output.mysql.MySQLOuputEventRequest;
 import com.demo.output.mysql.MySQLOutputTask;
 import com.demo.output.transform.UpperCaseTransformEventRequest;
-import com.demo.output.transform.UpperCaseTransformOutputTask;
+import com.demo.output.transform.UpperCaseTransformTask;
 import com.google.gson.Gson;
 
 @Service
@@ -32,12 +32,19 @@ public class TaskEventConsumer {
   OracleInputTask oracleInputTask;
 
   @Autowired
+  UpperCaseTransformTask upperCaseTransformTask;
+
+  @Autowired
   MySQLOutputTask mySQLTask;
 
   @Value(value = "${spring.kafka.consumer.bootstrap-servers}")
   private String bootstrapAddress;
+
   @Value(value = "${spring.kafka.consumer.group-id}")
   private String groupId;
+
+  @Value(value = "${topic.partition}")
+  private int topicPartition;
 
   @KafkaListener(topics = "wf_instance_task_events", groupId = "task_events")
   public void consume(Event request) throws Exception {
@@ -62,10 +69,10 @@ public class TaskEventConsumer {
     TaskSubType taskSubtype = TaskSubType.valueOf(((EventRequest) request).getSettings().getType());
     switch (taskSubtype) {
     case UpperCase:
-      UpperCaseTransformOutputTask task = new UpperCaseTransformOutputTask(groupId,
-          (UpperCaseTransformEventRequest) request);
-
-      task.execute();
+      upperCaseTransformTask.execute((UpperCaseTransformEventRequest) request);
+      //      UpperCaseTransformOutputTask task = new UpperCaseTransformOutputTask(groupId,
+      //          (UpperCaseTransformEventRequest) request, topicPartition, kafkaTemplate);
+      //      task.execute();
       break;
     default:
       throw new Exception("Invalid transform task type [" + taskSubtype.name() + "]");

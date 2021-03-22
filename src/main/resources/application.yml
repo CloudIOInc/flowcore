@@ -12,8 +12,8 @@ spring:
       bootstrap-servers: localhost:9092
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: com.demo.util.JsonSerializer
-      max-request-size: 600000000
-      message-max-bytes: 200000000
+      max-request-size: 600000
+      message-max-bytes: 2000000
 topic:
   partition: 3
   replica: 1

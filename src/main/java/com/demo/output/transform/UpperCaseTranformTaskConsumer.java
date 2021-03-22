@@ -9,14 +9,12 @@
  * with the terms of the license agreement you entered into with CloudIO.
  */
 
-package com.demo.input.oracle;
+package com.demo.output.transform;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-
-import javax.sql.DataSource;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -29,25 +27,23 @@ import com.demo.events.JobConsumerStatus;
 import com.demo.messages.Record;
 import com.demo.messages.Topics;
 
-public class OracleInputTaskConsumer extends Consumer {
-  private static Logger logger = LogManager.getLogger(OracleInputTaskConsumer.class);
+public class UpperCaseTranformTaskConsumer extends Consumer {
 
-  private Map<TopicPartition, OracleSubTask> pendingTaskMap = new ConcurrentHashMap<>();
-  private DataSource ds;
-  OracleInputEventRequest message;
+  private static Logger logger = LogManager.getLogger(UpperCaseTranformTaskConsumer.class);
+  private Map<TopicPartition, UpperCaseSubTask> pendingTaskMap = new ConcurrentHashMap<>();
+  UpperCaseTransformEventRequest message;
 
-  public OracleInputTaskConsumer(DataSource ds, OracleInputEventRequest message) {
-    super(Topics.ORACLE_SUB_TASK, Topics.ORALCE_INPUT_TASK_TOPIC);
+  public UpperCaseTranformTaskConsumer(UpperCaseTransformEventRequest message) {
+    super(Topics.UPPERCASE_SUB_TASK, Topics.UPPERCASE_TRANSFORM_TASK_TOPIC);
     // offset commits are handled by this class
     // hence turn off the default commit in parent class Consumer
     setCommitOffsets(false);
     this.message = message;
-    this.ds = ds;
   }
 
   @Override
   public String getName() {
-    return "OracleInput";
+    return "UpperCaseTransform";
   }
 
   @Override
@@ -58,7 +54,7 @@ public class OracleInputTaskConsumer extends Consumer {
       return;
     }
     final CompletableFuture<Boolean> future;
-    final OracleSubTask task;
+    final UpperCaseSubTask task;
     final Record firstMessage = list.get(0);
     final Record lastMessage = list.get(list.size() - 1);
     // add start offset, end offset
@@ -68,7 +64,7 @@ public class OracleInputTaskConsumer extends Consumer {
 
     monitor.enter();
     try {
-      OracleSubTask pendingTask = pendingTaskMap.get(topicPartition);
+      UpperCaseSubTask pendingTask = pendingTaskMap.get(topicPartition);
       if (pendingTask != null) {
         // this should never happen
         throw CloudIOException.with(
@@ -84,7 +80,7 @@ public class OracleInputTaskConsumer extends Consumer {
           new JobConsumerStatus(getName(), lastMessage.getAsString("wfNodeInstanceId"),
               JobConsumerStatus.Status.Running,
               startOffset, endOffset));
-      task = new OracleSubTask(topicPartition, list, ds, message);
+      task = new UpperCaseSubTask(topicPartition, list, message);
       pauseBeforeNextPoll(topicPartition);
       pendingTaskMap.put(topicPartition, task);
     } finally {

@@ -1,11 +1,11 @@
 
 package com.demo.output.mysql;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,35 +18,29 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
 import com.demo.events.BaseConsumer;
+import com.demo.messages.Record;
 import com.demo.output.OutputTask;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.gson.JsonPrimitive;
 
 @Service
 public class MySQLOutputTask extends OutputTask {
 
   private Logger logger = LoggerFactory.getLogger(MySQLOutputTask.class);
 
-  private KafkaConsumer<String, String> kafkaConsumer;
+  private KafkaConsumer<String, Record> kafkaConsumer;
 
   private MySQLOuputEventRequest message;
 
   private JsonArray schema;
-  
+
   private MySQLOutputSettings settings;
 
   public MySQLOutputTask() {
@@ -59,12 +53,12 @@ public class MySQLOutputTask extends OutputTask {
    * For this example, the list consists of only one topic. But you can give it a try with multiple topics.
    */
   public void execute(MySQLOuputEventRequest eventMessage, String groupId) {
-    
+
     try {
-      kafkaConsumer = new KafkaConsumer<>(BaseConsumer.getProperties(groupId));
+      kafkaConsumer = new KafkaConsumer<String, Record>(BaseConsumer.getProperties(groupId));
       message = eventMessage;
-      
-      settings = (MySQLOutputSettings)eventMessage.getSettings();
+
+      settings = eventMessage.getSettings();
       // Properties consumerProperties, JsonArray schema
       this.schema = getSchema(settings.getObjectName());
       /*
@@ -73,62 +67,44 @@ public class MySQLOutputTask extends OutputTask {
        */
 
       //kafkaConsumer.poll(0);
-      initConsumer();
+      initConsumer(kafkaConsumer, message);
+
       DataSource ds = getDataSource(message);
       while (true) {
+        ConsumerRecords<String, Record> records = kafkaConsumer.poll(Duration.ofSeconds(60));
 
-        ConsumerRecords<String, String> records = kafkaConsumer.poll(100);
         if (records.count() == 0) {
           break;
         }
-        List<JsonObject> dataRecs = new ArrayList<JsonObject>();
-        for (ConsumerRecord<String, String> record : records) {
-          String message = record.value();
+        List<Record> dataRecs = new ArrayList<Record>();
+        ConsumerRecord<String, Record> lastRecord = null;
+        for (ConsumerRecord<String, Record> record : records) {
+          Record message = record.value();
           logger.info("Received message: " + message);
           try {
-            JsonElement data = JsonParser.parseString(message);
-            dataRecs.add(data.getAsJsonObject());
+            dataRecs.add(message);
+            lastRecord = record;
           } catch (Exception e) {
             logger.error(e.getMessage());
           }
 
-          /*
-          Once we finish processing a Kafka message, we have to commit the offset so that
-          we don't end up consuming the same message endlessly. By default, the consumer object takes
-          care of this. But to demonstrate how it can be done, we have turned this default behaviour off,
-          instead, we're going to manually commit the offsets.
-          The code for this is below. It's pretty much self explanatory.
-           */
-          {
-            Map<TopicPartition, OffsetAndMetadata> commitMessage = new HashMap<>();
-
-            commitMessage.put(new TopicPartition(record.topic(), record.partition()),
-                new OffsetAndMetadata(record.offset() + 1));
-
-            kafkaConsumer.commitSync(commitMessage);
-          }
         }
-        if(dataRecs.size() > 0) {
+        if (lastRecord != null) {
+          Map<TopicPartition, OffsetAndMetadata> commitMessage = new HashMap<>();
+          commitMessage.put(new TopicPartition(lastRecord.topic(), lastRecord.partition()),
+              new OffsetAndMetadata(lastRecord.offset() + 1));
+          kafkaConsumer.commitSync(commitMessage);
+        }
+        if (dataRecs.size() > 0) {
           postData(ds, dataRecs);
         }
-        
+
         logger.info("Posted data successfully!");
       }
-    }catch(Exception e) {
+    } catch (Exception e) {
       logger.error(e.getMessage());
     }
-    
-  }
 
-  private void initConsumer() {
-    kafkaConsumer.seekToBeginning(kafkaConsumer.assignment());
-    List<TopicPartition> partitions = new ArrayList<>();
-    for (PartitionInfo partition : kafkaConsumer.partitionsFor(message.getToTopic()))
-      partitions.add(new TopicPartition(message.getToTopic(), partition.partition()));
-    kafkaConsumer.assign(partitions);
-    Map<TopicPartition, Long> offset = kafkaConsumer.endOffsets(kafkaConsumer.assignment());
-    Long endOffset = offset.get(kafkaConsumer.assignment());
-    logger.info("End offset - {}", endOffset);
   }
 
   public DataSource getDataSource(MySQLOuputEventRequest message) {
@@ -140,7 +116,7 @@ public class MySQLOutputTask extends OutputTask {
     return dataSourceBuilder.build();
   }
 
-  public void postData(DataSource ds, List<JsonObject> dataRecs) {
+  public void postData(DataSource ds, List<Record> dataRecs) {
 
     Connection con = null;
     PreparedStatement ps = null;
@@ -151,15 +127,15 @@ public class MySQLOutputTask extends OutputTask {
 
       long start = System.currentTimeMillis();
       for (int i = 0; i < dataRecs.size(); i++) {
-        JsonObject jsonObject = dataRecs.get(i);
-        Set<String> keys = jsonObject.keySet();
+        Record r = dataRecs.get(i);
+        Set<String> keys = r.keySet();
         int colIndex = 1;
-        for(String key : keys) {
-          JsonPrimitive val = jsonObject.get(key).getAsJsonPrimitive();
-          if(val.isNumber()) {
-            ps.setInt(colIndex, val.getAsInt());
-          }else {
-            ps.setString(colIndex, val.getAsString());
+        for (String key : keys) {
+          Object val = r.get(key);
+          if (val instanceof Number) {
+            ps.setDouble(colIndex, ((BigDecimal) val).doubleValue());
+          } else {
+            ps.setString(colIndex, ((String) val));
           }
           colIndex++;
         }
@@ -197,16 +173,14 @@ public class MySQLOutputTask extends OutputTask {
       sb.append(obj.get("fieldName").getAsString()).append(",");
       placeHolder.append("?,");
     });
-    
-    sb.deleteCharAt(sb.length()-1);
-    placeHolder.deleteCharAt(placeHolder.length()-1);
+
+    sb.deleteCharAt(sb.length() - 1);
+    placeHolder.deleteCharAt(placeHolder.length() - 1);
     sb.append(") values (");
     sb.append(placeHolder.toString());
     sb.append(")");
-    
-    
+
     return sb.toString();
   }
-  
-  
+
 }

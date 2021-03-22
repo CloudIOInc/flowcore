@@ -34,19 +34,22 @@ import com.demo.events.StringUtil;
 import com.demo.messages.KafkaUtil;
 import com.demo.messages.Record;
 
-public class OracleSubTask2 implements Runnable {
-  static Logger logger = LogManager.getLogger(OracleSubTask2.class);
+public class OracleSubTask implements Runnable {
+  static Logger logger = LogManager.getLogger(OracleSubTask.class);
 
   TopicPartition topicPartition;
   List<Record> list;
   private CompletableFuture<Boolean> future;
   protected boolean failed = false;
   DataSource ds;
+  OracleInputEventRequest message;
 
-  public OracleSubTask2(TopicPartition topicPartition, List<Record> list, DataSource ds) {
+  public OracleSubTask(TopicPartition topicPartition, List<Record> list, DataSource ds,
+      OracleInputEventRequest message) {
     this.list = list;
     this.topicPartition = topicPartition;
     this.ds = ds;
+    this.message = message;
   }
 
   public void processMessages(TopicPartition topicPartition, List<Record> list) throws Throwable {
@@ -60,32 +63,28 @@ public class OracleSubTask2 implements Runnable {
     if (size != list.size()) {
       logger.debug("Skipped {} of {} dumped events", size - list.size(), size);
     }
-    String dataTopic = "dt-013";
+    String dataTopic = message.getToTopic();
     try (Producer producer = Producer.get()) {
       try {
         process(producer, dataTopic, list);
-        Notification.error("test", "Output",
-            StringUtil.format("Failed to post {} event to {}", "", ""),
-            null);
-
       } catch (Throwable e) {
         producer.abortTransactionQuietly();
         if (e instanceof CloudIOException) {
           ((CloudIOException) e).setErrorType("Output");
           logger.catching(e);
-          //
-
+          Notification.error("Oracle", "Input",
+              StringUtil.format("Failed to post {} event to {}", message.getSettings().getType(), message.getToTopic()),
+              null);
           if (list.size() > 0) {
-            list.forEach(m -> {
-              //   IO.handleError(topicPartition.topic(), m, e);
-            });
+            //            list.forEach(m -> {
+            //              //   IO.handleError(topicPartition.topic(), m, e);
+            //            });
             Producer.sendMessages("errors", list);
           }
         }
         return;
       }
     }
-    logger.error("No service found for output type {}!");
   }
 
   public void process(Producer producer, String topicName, List<Record> recs) throws Exception {

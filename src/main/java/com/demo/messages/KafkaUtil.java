@@ -296,7 +296,7 @@ public class KafkaUtil {
     return AdminClient.create(properties);
   }
 
-  public static Map<String, Integer> getEndOffsets(String topicName, String groupId, int topicPartition) {
+  public static Map<String, Integer> getOffsets(String topicName, String groupId, int topicPartition, boolean isStart) {
     Properties consumerProps = BaseConsumer.getProperties(groupId);
     Map<String, Integer> offsetMap = new HashMap<String, Integer>();
     try (KafkaConsumer<String, String> list = new KafkaConsumer<>(consumerProps)) {
@@ -313,8 +313,13 @@ public class KafkaUtil {
           TopicPartition partition = new TopicPartition(topicName, partitionInfo.partition());
           partitions.add(partition);
         }
-        Map<TopicPartition, Long> endingOffsets = list.endOffsets(partitions);
-        Set<Entry<TopicPartition, Long>> offsets = endingOffsets.entrySet();
+        Map<TopicPartition, Long> offSets = null;
+        if (isStart) {
+          offSets = list.beginningOffsets(partitions);
+        } else {
+          offSets = list.endOffsets(partitions);
+        }
+        Set<Entry<TopicPartition, Long>> offsets = offSets.entrySet();
         for (Entry<TopicPartition, Long> of : offsets) {
           Long endOffset = of.getValue();
           String partition = of.getKey().toString();

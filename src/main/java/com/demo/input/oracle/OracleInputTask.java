@@ -53,7 +53,7 @@ public class OracleInputTask {
     this.request = request;
     long stime = new Date().getTime();
     try {
-      String topicName = "oralce_input_task_topic";
+      String topicName = Topics.ORALCE_INPUT_TASK_TOPIC;
       KafkaUtil.createTopic(KafkaUtil.getAdminClient(), topicName, topicPartition, false);
       //create data topic
       String toTopic = request.getToTopic();
@@ -61,7 +61,7 @@ public class OracleInputTask {
       executeInternal(request, topicName);
       //  postEvent(message, totalRows);
       DataSource ds = getDataSource(request);
-      OracleInputTaskConsumer inputConsumer = new OracleInputTaskConsumer(ds);
+      OracleInputTaskConsumer inputConsumer = new OracleInputTaskConsumer(ds, request);
       KafkaUtil.executeOnKafkaScheduler(inputConsumer);
       postEvent(request);
     } catch (Exception e) {
@@ -89,8 +89,8 @@ public class OracleInputTask {
     // response.setInputCount(totalRows);
     response.setWfFlowId(request.getWfFlowId());
     response.setWfFlowInstanceId(request.getWfFlowInstanceId());
-    Map<String, Integer> endOffsets = KafkaUtil.getEndOffsets(request.getToTopic(), groupId, topicPartition);
-    response.setStartOffset(endOffsets);
+    Map<String, Integer> startOffsets = KafkaUtil.getOffsets(request.getToTopic(), groupId, topicPartition, true);
+    response.setStartOffset(startOffsets);
     kafkaTemplate.send(Topics.EVENT_TOPIC, response);
   }
 
