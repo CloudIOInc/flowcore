@@ -19,17 +19,13 @@ import org.slf4j.LoggerFactory;
 import com.demo.events.BaseConsumer;
 import com.demo.events.Producer;
 import com.demo.messages.Record;
-import com.demo.util.Util;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 public class UpperCaseTransformOutputTask {
 
   private Logger logger = LoggerFactory.getLogger(UpperCaseTransformOutputTask.class);
 
-  private KafkaConsumer<String, String> kafkaConsumer;
+  private KafkaConsumer<String, Record> kafkaConsumer;
 
   private UpperCaseTransformEventRequest message;
 
@@ -60,19 +56,18 @@ public class UpperCaseTransformOutputTask {
 
     while (true) {
 
-      ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofSeconds(60));
+      ConsumerRecords<String, Record> records = kafkaConsumer.poll(Duration.ofSeconds(60));
       if (records.count() == 0) {
         break;
       }
       try (Producer producer = Producer.get()) {
-        List<JsonObject> dataRecs = new ArrayList<JsonObject>();
+        List<Record> dataRecs = new ArrayList<Record>();
         ConsumerRecord<String, String> lastRecord = null;
-        for (ConsumerRecord<String, String> record : records) {
-          String message = record.value();
+        for (ConsumerRecord<String, Record> record : records) {
+          Record message = record.value();
           logger.info("Received message: " + message);
           try {
-            JsonElement data = JsonParser.parseString(message);
-            dataRecs.add(data.getAsJsonObject());
+            dataRecs.add(message);
 
             Map<TopicPartition, OffsetAndMetadata> commitMessage = new HashMap<>();
 
@@ -105,16 +100,15 @@ public class UpperCaseTransformOutputTask {
     // kafkaConsumer.assign(partitions);
   }
 
-  public void processData(Producer producer, List<JsonObject> dataRecs) throws Exception {
+  public void processData(Producer producer, List<Record> dataRecs) throws Exception {
     producer.beginTransaction();
     List<String> fields = message.getSettings().getTransforFields();
     boolean isTransorm = fields != null && fields.size() > 0;
-    for (JsonObject obj : dataRecs) {
-      Record r = Util.getRecord(obj);
+    for (Record obj : dataRecs) {
       if (isTransorm) {
-        transform(fields, r);
+        transform(fields, obj);
       }
-      producer.send(message.getToTopic(), r);
+      producer.send(message.getToTopic(), obj);
     }
     producer.commitTransaction();
   }
