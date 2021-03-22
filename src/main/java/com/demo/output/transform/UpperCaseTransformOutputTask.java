@@ -1,5 +1,5 @@
 
-package com.demo.output;
+package com.demo.output.transform;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -28,9 +28,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-public class MySQLOutputTask {
+public class UpperCaseTransformOutputTask {
 
-  private Logger logger = LoggerFactory.getLogger(MySQLOutputTask.class);
+  private Logger logger = LoggerFactory.getLogger(UpperCaseTransformOutputTask.class);
 
   private KafkaConsumer<String, String> kafkaConsumer;
 
@@ -38,7 +38,7 @@ public class MySQLOutputTask {
 
   private JsonArray schema;
 
-  public MySQLOutputTask(OutputMessage eventMessage, Properties consumerProperties, JsonArray schema) {
+  public UpperCaseTransformOutputTask(OutputMessage eventMessage, Properties consumerProperties, JsonArray schema) {
 
     kafkaConsumer = new KafkaConsumer<>(consumerProperties);
     message = eventMessage;

@@ -12,13 +12,14 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
-import com.demo.input.OracleInputTask;
+import com.demo.input.oracle.OracleInputEventRequest;
+import com.demo.input.oracle.OracleInputEventResponse;
+import com.demo.input.oracle.OracleInputTask;
 import com.demo.messages.Context;
 import com.demo.messages.EventRequest;
-import com.demo.messages.OracleInputEventRequest;
 import com.demo.messages.OutputMessage;
-import com.demo.messages.ResponseMessage;
 import com.demo.messages.Settings;
+import com.demo.output.transform.UpperCaseTransformEventRequest;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -118,20 +119,24 @@ public class TaskEventConsumer {
     Type objType = new TypeToken<EventRequest<Settings, Context>>() {
     }.getType();
     if (TaskType.Input.name().equals(inputObj.get("taskType").getAsString())) {
-      if (TaskType.Tansform.name().equals(inputObj.get("taskSubType").getAsString())) {
+      if (TaskType.Tansform.name().equals(inputObj.get("settings").getAsJsonObject().get("type").getAsString())) {
 
       } else if (Input.Oracle.name().equals(inputObj.get("settings").getAsJsonObject().get("type").getAsString())) {
-        objType = new TypeToken<OracleInputEventRequest>() {
+        objType = new TypeToken<UpperCaseTransformEventRequest>() {
         }.getType();
       }
-    } else if (TaskType.Output.name().equals(inputObj.get("eventType").getAsString())) {
+    } else if (TaskType.Output.name().equals(inputObj.get("taskType").getAsString())) {
       objType = new TypeToken<OutputMessage>() {
       }.getType();
-    } else if (TaskType.Response.name().equals(inputObj.get("eventType").getAsString())) {
-      objType = new TypeToken<ResponseMessage>() {
-      }.getType();
-    }
+    } else if (TaskType.Response.name().equals(inputObj.get("taskType").getAsString())) {
+      if (TaskType.Tansform.name().equals(inputObj.get("settings").getAsString())) {
 
+      } else if (Input.Oracle.name().equals(inputObj.get("settings").getAsJsonObject().get("type").getAsString())) {
+
+        objType = new TypeToken<OracleInputEventResponse>() {
+        }.getType();
+      }
+    }
     return gson.fromJson(message, objType);
   }
 

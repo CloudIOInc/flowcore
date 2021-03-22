@@ -1,5 +1,5 @@
 
-package com.demo.input;
+package com.demo.input.oracle;
 
 import com.demo.util.Util;
 

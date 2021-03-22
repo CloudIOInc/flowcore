@@ -1,5 +1,5 @@
 
-package com.demo.output;
+package com.demo.output.mysql;
 
 public class Constants {
 

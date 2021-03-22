@@ -1,5 +1,7 @@
 
-package com.demo.messages;
+package com.demo.input.oracle;
+
+import com.demo.messages.Settings;
 
 public class OracleInputSettings extends Settings {
 

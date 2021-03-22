@@ -1,6 +1,7 @@
 
-package com.demo.messages;
+package com.demo.input.oracle;
 
+import com.demo.messages.EventRequest;
 import com.demo.util.Util;
 
 public class OracleInputEventRequest extends EventRequest<OracleInputSettings, OracleInputContext> {

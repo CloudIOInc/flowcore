@@ -28,7 +28,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.demo.input.Record;
+import com.demo.messages.Record;
 import com.demo.util.Util;
 
 public abstract class Consumer extends BaseConsumer<String, String> {

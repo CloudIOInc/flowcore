@@ -28,7 +28,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.demo.input.Record;
+import com.demo.messages.Record;
 
 public class Producer extends KafkaProducer<String, Record> implements TransactionProducer<String, Record> {
   static Logger logger = LogManager.getLogger(Producer.class);

@@ -1,5 +1,5 @@
 
-package com.demo.input;
+package com.demo.input.oracle;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -19,8 +19,7 @@ import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
-import com.demo.messages.OracleInputEventRequest;
-import com.demo.messages.OracleInputEventResponse;
+import com.demo.messages.KafkaUtil;
 import com.demo.messages.Topics;
 
 @Service

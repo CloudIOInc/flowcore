@@ -9,7 +9,7 @@
  * with the terms of the license agreement you entered into with CloudIO.
  */
 
-package com.demo.input;
+package com.demo.input.oracle;
 
 import java.util.List;
 import java.util.Map;
@@ -26,6 +26,7 @@ import org.apache.logging.log4j.Logger;
 import com.demo.events.CloudIOException;
 import com.demo.events.Consumer;
 import com.demo.events.JobConsumerStatus;
+import com.demo.messages.Record;
 
 public class OracleInputTaskConsumer extends Consumer {
   private static Logger logger = LogManager.getLogger(OracleInputTaskConsumer.class);

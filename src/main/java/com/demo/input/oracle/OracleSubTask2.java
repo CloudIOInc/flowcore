@@ -9,7 +9,7 @@
  * with the terms of the license agreement you entered into with CloudIO.
  */
 
-package com.demo.input;
+package com.demo.input.oracle;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -31,6 +31,8 @@ import com.demo.events.CloudIOException;
 import com.demo.events.Notification;
 import com.demo.events.Producer;
 import com.demo.events.StringUtil;
+import com.demo.messages.KafkaUtil;
+import com.demo.messages.Record;
 
 public class OracleSubTask2 implements Runnable {
   static Logger logger = LogManager.getLogger(OracleSubTask2.class);

@@ -1,5 +1,5 @@
 
-package com.demo.input;
+package com.demo.messages;
 
 public class Constants {
 

@@ -1,5 +1,8 @@
 
-package com.demo.messages;
+package com.demo.input.oracle;
+
+import com.demo.messages.Context;
+import com.demo.messages.IncrementalOffset;
 
 public class OracleInputContext extends Context {
   private String status;

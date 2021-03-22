@@ -9,7 +9,7 @@
  * with the terms of the license agreement you entered into with CloudIO.
  */
 
-package com.demo.input;
+package com.demo.messages;
 
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
