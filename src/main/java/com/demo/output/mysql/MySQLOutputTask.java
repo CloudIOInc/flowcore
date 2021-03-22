@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import javax.sql.DataSource;
 
@@ -22,26 +21,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 
-import com.demo.messages.OutputMessage;
+import com.demo.events.BaseConsumer;
+import com.demo.output.OutputTask;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-public class MySQLOutputTask {
+public class MySQLOutputTask extends OutputTask {
 
   private Logger logger = LoggerFactory.getLogger(MySQLOutputTask.class);
 
   private KafkaConsumer<String, String> kafkaConsumer;
 
-  private OutputMessage message;
+  private MySQLOuputEventRequest message;
 
   private JsonArray schema;
 
-  public MySQLOutputTask(OutputMessage eventMessage, Properties consumerProperties, JsonArray schema) {
+  public MySQLOutputTask(MySQLOuputEventRequest eventMessage, String groupId) {
 
-    kafkaConsumer = new KafkaConsumer<>(consumerProperties);
+    kafkaConsumer = new KafkaConsumer<>(BaseConsumer.getProperties(groupId));
     message = eventMessage;
+    // Properties consumerProperties, JsonArray schema
     this.schema = schema;
   }
 
@@ -54,7 +55,7 @@ public class MySQLOutputTask {
 
     /*
      * We will start an infinite while loop, inside which we'll be listening to
-     * new messages in each topic that we've subscribed to.
+     * new messages in each topic that we've subscribed to.MySQLOuputEventRequest
      */
 
     //kafkaConsumer.poll(0);
@@ -101,20 +102,20 @@ public class MySQLOutputTask {
   private void initConsumer() {
     kafkaConsumer.seekToBeginning(kafkaConsumer.assignment());
     List<TopicPartition> partitions = new ArrayList<>();
-    for (PartitionInfo partition : kafkaConsumer.partitionsFor(message.getDataTopic()))
-      partitions.add(new TopicPartition(message.getDataTopic(), partition.partition()));
+    for (PartitionInfo partition : kafkaConsumer.partitionsFor(message.getToTopic()))
+      partitions.add(new TopicPartition(message.getToTopic(), partition.partition()));
     kafkaConsumer.assign(partitions);
     Map<TopicPartition, Long> offset = kafkaConsumer.endOffsets(kafkaConsumer.assignment());
     Long endOffset = offset.get(kafkaConsumer.assignment());
     logger.info("End offset - {}", endOffset);
   }
 
-  public DataSource getDataSource(OutputMessage message) {
+  public DataSource getDataSource(MySQLOuputEventRequest message) {
     DataSourceBuilder dataSourceBuilder = DataSourceBuilder.create();
     dataSourceBuilder.driverClassName("oracle.jdbc.driver.OracleDriver");
-    dataSourceBuilder.url(message.getOutputSettings().getBaseUrl());
-    dataSourceBuilder.username(message.getOutputSettings().getUserName());
-    dataSourceBuilder.password(message.getOutputSettings().getPassword());
+    dataSourceBuilder.url(message.getSettings().getJdbcUrl());
+    dataSourceBuilder.username(message.getSettings().getUserName());
+    dataSourceBuilder.password(message.getSettings().getPassword());
     return dataSourceBuilder.build();
   }
 
@@ -157,7 +158,7 @@ public class MySQLOutputTask {
   private String getInsertQuery() {
     StringBuilder sb = new StringBuilder();
     sb.append("insert into ")
-        .append(message.getOutputSettings().getObjectName())
+        .append(message.getSettings().getTableName())
         .append("(");
     schema.forEach(element -> {
       logger.info(element.getAsJsonObject().toString());

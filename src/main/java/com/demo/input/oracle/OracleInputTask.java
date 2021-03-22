@@ -19,6 +19,7 @@ import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import com.demo.events.TaskEventConsumer.TaskType;
 import com.demo.messages.KafkaUtil;
 import com.demo.messages.Topics;
 
@@ -42,7 +43,7 @@ public class OracleInputTask {
   @Value(value = "${spring.kafka.consumer.group-id}")
   private String groupId;
 
-  private Logger logger = Logger.getLogger("OracleSubTask");
+  private Logger logger = Logger.getLogger("OracleInputTask");
 
   public String getSQL() {
     return "Select COUNT(1) ROW_COUNT from " + request.getSettings().getTableName();
@@ -83,12 +84,13 @@ public class OracleInputTask {
     response.setEndOffset(null);
     response.setStartOffset(null);
     response.setStatus("RUNNING");
-
+    response.setTaskType(TaskType.Response.name());
+    response.setStartDate(new Date());
     // response.setInputCount(totalRows);
     response.setWfFlowId(request.getWfFlowId());
     response.setWfFlowInstanceId(request.getWfFlowInstanceId());
-    Map<Integer, Integer> endOffsets = KafkaUtil.getEndOffsets(request.getToTopic(), groupId, topicPartition);
-    response.setEndOffset(endOffsets);
+    Map<String, Integer> endOffsets = KafkaUtil.getEndOffsets(request.getToTopic(), groupId, topicPartition);
+    response.setStartOffset(endOffsets);
     kafkaTemplate.send(Topics.EVENT_TOPIC, response.toString());
   }
 

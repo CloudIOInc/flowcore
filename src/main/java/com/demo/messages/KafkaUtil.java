@@ -296,9 +296,9 @@ public class KafkaUtil {
     return AdminClient.create(properties);
   }
 
-  public static Map<Integer, Integer> getEndOffsets(String topicName, String groupId, int topicPartition) {
+  public static Map<String, Integer> getEndOffsets(String topicName, String groupId, int topicPartition) {
     Properties consumerProps = BaseConsumer.getProperties(groupId);
-    Map<Integer, Integer> offsetMap = new HashMap<Integer, Integer>();
+    Map<String, Integer> offsetMap = new HashMap<String, Integer>();
     try (KafkaConsumer<String, String> list = new KafkaConsumer<>(consumerProps)) {
       // First, check if the topic exists in the list of all topics
       // First, check if the topic exists in the list of all topics
@@ -317,8 +317,8 @@ public class KafkaUtil {
         Set<Entry<TopicPartition, Long>> offsets = endingOffsets.entrySet();
         for (Entry<TopicPartition, Long> of : offsets) {
           Long endOffset = of.getValue();
-          int epartition = of.getKey().partition();
-          offsetMap.put(epartition, endOffset.intValue());
+          String partition = of.getKey().toString();
+          offsetMap.put(partition, endOffset.intValue());
         }
       }
 
