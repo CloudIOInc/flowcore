@@ -1,9 +1,9 @@
 
 package com.demo.messages;
 
-public class OutputSettings {
+public class OutputSettings extends Settings{
   private String objectName;
-  private String type;
+  //private String type;
   private String baseUrl;
   private String userName;
   private String password;
@@ -16,15 +16,7 @@ public class OutputSettings {
     this.objectName = objectName;
   }
 
-  public String getType() {
-    return type;
-  }
-
-  public void setType(String type) {
-    this.type = type;
-  }
-
-  public String getBaseUrl() {
+ public String getBaseUrl() {
     return baseUrl;
   }
 

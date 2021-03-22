@@ -37,6 +37,9 @@ public class TaskEventConsumer {
 
   @Autowired
   OracleInputTask oracleInputTask;
+  
+  @Autowired
+  MySQLOutputTask mySQLTask;
 
   @Value(value = "${spring.kafka.consumer.bootstrap-servers}")
   private String bootstrapAddress;
@@ -88,8 +91,8 @@ public class TaskEventConsumer {
     TaskSubType taskSubtype = TaskSubType.valueOf(request.getSettings().getType());
     switch (taskSubtype) {
     case MySQL:
-      MySQLOutputTask task = new MySQLOutputTask((MySQLOuputEventRequest) request, groupId);
-      task.execute();
+      //MySQLOutputTask task = new MySQLOutputTask((MySQLOuputEventRequest) request, groupId);
+      mySQLTask.execute((MySQLOuputEventRequest) request, groupId);
       break;
     default:
       throw new Exception("Invalid task type[" + taskSubtype.name() + "]");
