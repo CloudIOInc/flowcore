@@ -11,6 +11,7 @@ import java.util.Date;
 import com.demo.messages.Record;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.reflect.TypeToken;
 
 public class Util {
@@ -108,6 +109,12 @@ public class Util {
   static Gson gson = new Gson();
 
   public static Record getRecord(String message) {
+    Type objType = new TypeToken<Record>() {
+    }.getType();
+    return gson.fromJson(message, objType);
+  }
+
+  public static Record getRecord(JsonElement message) {
     Type objType = new TypeToken<Record>() {
     }.getType();
     return gson.fromJson(message, objType);
