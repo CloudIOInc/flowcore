@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.demo.events.TaskEventProducer;
+import com.demo.messages.Record;
+import com.demo.util.Util;
 import com.google.gson.JsonObject;
 
 @RestController
@@ -29,7 +31,8 @@ public class KafkaController {
       MediaType.APPLICATION_XML_VALUE }, produces = { MediaType.APPLICATION_JSON_VALUE,
           MediaType.APPLICATION_XML_VALUE })
   public ResponseEntity<String> publish(@RequestBody String request) throws Exception {
-    this.producer.sendMessage(request);
+    Record r = Util.getRecord(request);
+    this.producer.sendMessage(r);
     JsonObject response = new JsonObject();
     response.addProperty("response", "OK");
     response.addProperty("status", "Event posted successfully!");

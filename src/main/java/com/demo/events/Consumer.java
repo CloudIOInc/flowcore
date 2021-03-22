@@ -29,9 +29,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.demo.messages.Record;
-import com.demo.util.Util;
 
-public abstract class Consumer extends BaseConsumer<String, String> {
+public abstract class Consumer extends BaseConsumer<String, Record> {
   private static Logger logger = LogManager.getLogger(Consumer.class);
   private boolean commitOffsets = true;
 
@@ -48,8 +47,8 @@ public abstract class Consumer extends BaseConsumer<String, String> {
   }
 
   @Override
-  protected KafkaConsumer<String, String> createConsumer() {
-    return new KafkaConsumer<String, String>(properties);
+  protected KafkaConsumer<String, Record> createConsumer() {
+    return new KafkaConsumer<String, Record>(properties);
   }
 
   public void handleMessage(Record message) throws Throwable {
@@ -77,16 +76,16 @@ public abstract class Consumer extends BaseConsumer<String, String> {
   }
 
   public final void poll(int waitSeconds) throws Throwable {
-    ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(waitSeconds));
+    ConsumerRecords<String, Record> records = consumer.poll(Duration.ofSeconds(waitSeconds));
     if (records.count() > 0) {
       processRecords(records);
     }
   }
 
-  protected final void processRecords(ConsumerRecords<String, String> records) throws Throwable {
+  protected final void processRecords(ConsumerRecords<String, Record> records) throws Throwable {
     Throwable ex = null;
     for (TopicPartition partition : records.partitions()) {
-      List<ConsumerRecord<String, String>> partitionRecords = records.records(partition);
+      List<ConsumerRecord<String, Record>> partitionRecords = records.records(partition);
       if (partitionRecords.size() == 0) {
         continue;
       }
@@ -99,13 +98,13 @@ public abstract class Consumer extends BaseConsumer<String, String> {
       }
 
       List<Record> list = new ArrayList<>(partitionRecords.size());
-      for (ConsumerRecord<String, String> record : partitionRecords) {
-        String message = record.value();
+      for (ConsumerRecord<String, Record> record : partitionRecords) {
+        Record message = record.value();
         if (message == null) {
           continue;
         }
-        Record re = Util.getRecord(message);
-        list.add(re);
+        // Record re = Util.getRecord(message);
+        list.add(message);
       }
 
       try {

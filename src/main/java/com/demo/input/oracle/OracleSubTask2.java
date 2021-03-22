@@ -81,15 +81,6 @@ public class OracleSubTask2 implements Runnable {
             });
             Producer.sendMessages("errors", list);
           }
-          //connection errors
-          //        if (e instanceof PoolInitializationException || e instanceof SQLTransientConnectionException) {
-          //          OutputErrors.setConnectionError(flow, flowRuntime, ErrorHandler.getMessageHTML("", e), foundDataEvent);
-          //        }
-          //        String errorType = isReconcileRun ? "Reconcile Output Error" : "Output Error";
-          //        Notification.error(flow.getName() + "-" + flow.getUuid(), errorType,
-          //            StringUtil.format("Failed to post event to {}", flow.getOutputType()),
-          //            ErrorHandler.getMessageHTML("", e));
-
         }
         return;
       }

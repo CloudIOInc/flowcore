@@ -39,6 +39,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.ThreadContext;
 
+import com.demo.util.JsonDeserializer;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Monitor;
 
@@ -56,7 +57,7 @@ public abstract class BaseConsumer<K, V> implements Runnable, Resubscribe {
     properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
     properties.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 60_000);
     properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-    properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+    properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class.getName());
     if (groupId != null) {
       properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
     }

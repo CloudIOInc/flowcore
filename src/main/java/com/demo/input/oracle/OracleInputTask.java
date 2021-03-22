@@ -27,7 +27,7 @@ import com.demo.messages.Topics;
 public class OracleInputTask {
 
   @Autowired
-  private KafkaTemplate<String, String> kafkaTemplate;
+  private KafkaTemplate<String, Object> kafkaTemplate;
 
   OracleInputEventRequest request;
 
@@ -75,7 +75,7 @@ public class OracleInputTask {
     DataSource ds = getDataSource(request);
     List<OracleBatchInfo> batchInfoList = getBatchDetails(ds);
     for (OracleBatchInfo batchInfo : batchInfoList) {
-      kafkaTemplate.send(topic, batchInfo.toString());
+      kafkaTemplate.send(topic, batchInfo);
     }
   }
 
@@ -91,7 +91,7 @@ public class OracleInputTask {
     response.setWfFlowInstanceId(request.getWfFlowInstanceId());
     Map<String, Integer> endOffsets = KafkaUtil.getEndOffsets(request.getToTopic(), groupId, topicPartition);
     response.setStartOffset(endOffsets);
-    kafkaTemplate.send(Topics.EVENT_TOPIC, response.toString());
+    kafkaTemplate.send(Topics.EVENT_TOPIC, response);
   }
 
   private List<OracleBatchInfo> getBatchDetails(DataSource ds) {

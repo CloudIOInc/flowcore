@@ -4,7 +4,7 @@ package com.demo.messages;
 import java.util.Date;
 import java.util.Map;
 
-public class EventResponse<C> {
+public class EventResponse<C> implements Event {
   String wfFlowId;
   String wfFlowInstanceId;
   String wfNodeId;

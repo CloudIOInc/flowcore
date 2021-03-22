@@ -1,8 +1,6 @@
 
 package com.demo.events;
 
-import java.lang.reflect.Type;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -10,19 +8,14 @@ import org.springframework.stereotype.Service;
 
 import com.demo.input.oracle.OracleInputEventRequest;
 import com.demo.input.oracle.OracleInputTask;
-import com.demo.messages.Context;
+import com.demo.messages.Event;
 import com.demo.messages.EventRequest;
-import com.demo.messages.EventResponse;
-import com.demo.messages.Settings;
+import com.demo.messages.Record;
 import com.demo.output.mysql.MySQLOuputEventRequest;
 import com.demo.output.mysql.MySQLOutputTask;
 import com.demo.output.transform.UpperCaseTransformEventRequest;
 import com.demo.output.transform.UpperCaseTransformOutputTask;
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.gson.reflect.TypeToken;
 
 @Service
 public class TaskEventConsumer {
@@ -37,7 +30,7 @@ public class TaskEventConsumer {
 
   @Autowired
   OracleInputTask oracleInputTask;
-  
+
   @Autowired
   MySQLOutputTask mySQLTask;
 
@@ -47,16 +40,8 @@ public class TaskEventConsumer {
   private String groupId;
 
   @KafkaListener(topics = "wf_instance_task_events", groupId = "task_events")
-  public void consume(String message) throws Exception {
+  public void consume(Event request) throws Exception {
     //split events
-
-    if (getEventRespose(message) != null) {
-      //skip all responses for now;
-      return;
-    }
-    ;
-    EventRequest<Settings, Context> request = getEventRequest(message);
-
     TaskType eventType = TaskType.valueOf(request.getTaskType());
     switch (eventType) {
     case Input:
@@ -73,8 +58,8 @@ public class TaskEventConsumer {
     }
   }
 
-  private void handleTransformMessage(EventRequest request) throws Exception {
-    TaskSubType taskSubtype = TaskSubType.valueOf(request.getSettings().getType());
+  private void handleTransformMessage(Event request) throws Exception {
+    TaskSubType taskSubtype = TaskSubType.valueOf(((EventRequest) request).getSettings().getType());
     switch (taskSubtype) {
     case UpperCase:
       UpperCaseTransformOutputTask task = new UpperCaseTransformOutputTask(groupId,
@@ -83,71 +68,51 @@ public class TaskEventConsumer {
       task.execute();
       break;
     default:
-      throw new Exception("Invalid task type[" + taskSubtype.name() + "]");
+      throw new Exception("Invalid transform task type [" + taskSubtype.name() + "]");
     }
   }
 
-  private void handleOutputMessage(EventRequest request) throws Exception {
-    TaskSubType taskSubtype = TaskSubType.valueOf(request.getSettings().getType());
+  private void handleOutputMessage(Event request) throws Exception {
+    TaskSubType taskSubtype = TaskSubType.valueOf(((EventRequest) request).getSettings().getType());
     switch (taskSubtype) {
     case MySQL:
       //MySQLOutputTask task = new MySQLOutputTask((MySQLOuputEventRequest) request, groupId);
       mySQLTask.execute((MySQLOuputEventRequest) request, groupId);
       break;
     default:
-      throw new Exception("Invalid task type[" + taskSubtype.name() + "]");
+      throw new Exception("Invalid output task type [" + taskSubtype.name() + "]");
     }
   }
 
-  private void handleInputMessage(EventRequest request) throws Exception {
-    TaskSubType input = TaskSubType.valueOf(request.getSettings().getType());
+  private void handleInputMessage(Event request) throws Exception {
+    TaskSubType input = TaskSubType.valueOf(((EventRequest) request).getSettings().getType());
     switch (input) {
     case Oracle:
       oracleInputTask.execute((OracleInputEventRequest) request);
       break;
     default:
-      throw new Exception("Invalid input type[" + input.name() + "]");
+      throw new Exception("Invalid input task type [" + input.name() + "]");
     }
   }
 
   static Gson gson = new Gson();
 
-  public static EventRequest<Settings, Context> getEventRequest(String message) {
-    JsonElement input = JsonParser.parseString(message);
-    JsonObject inputObj = input.getAsJsonObject();
-    Type objType = new TypeToken<EventRequest<Settings, Context>>() {
-    }.getType();
-    if (TaskType.Input.name().equals(inputObj.get("taskType").getAsString())) {
-      if (TaskSubType.Oracle.name().equals(inputObj.get("settings").getAsJsonObject().get("type").getAsString())) {
-        objType = new TypeToken<OracleInputEventRequest>() {
-        }.getType();
-      }
-    } else if (TaskType.Transform.name().equals(inputObj.get("taskType").getAsString())) {
-      if (TaskSubType.UpperCase.name().equals(inputObj.get("settings").getAsJsonObject().get("type").getAsString())) {
-        objType = new TypeToken<UpperCaseTransformEventRequest>() {
-        }.getType();
-      }
-    } else if (TaskType.Output.name().equals(inputObj.get("taskType").getAsString())) {
-      if (TaskSubType.MySQL.name().equals(inputObj.get("settings").getAsJsonObject().get("type").getAsString())) {
-        objType = new TypeToken<MySQLOuputEventRequest>() {
-        }.getType();
-      }
-    }
-    return gson.fromJson(message, objType);
-  }
+  //  public static EventRequest<Settings, Context> getEventRequest(Record message) {
+  //    //  JsonElement input = JsonParser.parseString(message);
+  //    //  JsonObject inputObj = input.getAsJsonObject();
+  //
+  //    Type objType = new TypeToken<EventRequest<Settings, Context>>() {
+  //    }.getType();
+  //    objType = getEventType(message, objType);
+  //    return gson.fromJson(message.toJSON().getAsString(), objType);
+  //  }
 
-  public static EventResponse<Context> getEventRespose(String message) {
-    JsonElement input = JsonParser.parseString(message);
-    JsonObject inputObj = input.getAsJsonObject();
-    Type objType = new TypeToken<EventRequest<Settings, Context>>() {
-    }.getType();
-    if (TaskType.Response.name().equals(inputObj.get("taskType").getAsString())) {
-
-      objType = new TypeToken<EventResponse>() {
-      }.getType();
-      return gson.fromJson(message, objType);
+  private boolean isEventReponse(Record message) {
+    String taskType = message.getAsString("taskType");
+    if (TaskType.Response.name().equals(taskType)) {
+      return true;
     }
-    return null;
+    return false;
   }
 
 }

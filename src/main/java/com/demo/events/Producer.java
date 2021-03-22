@@ -29,6 +29,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.demo.messages.Record;
+import com.demo.util.JsonSerializer;
 
 public class Producer extends KafkaProducer<String, Record> implements TransactionProducer<String, Record> {
   static Logger logger = LogManager.getLogger(Producer.class);
@@ -94,7 +95,7 @@ public class Producer extends KafkaProducer<String, Record> implements Transacti
     Properties properties = new Properties();
     properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
     properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-    properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+    properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
     properties.put(ProducerConfig.LINGER_MS_CONFIG, 100);
     properties.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, 6_000_000); // 6 mb
     properties.put(ProducerConfig.BATCH_SIZE_CONFIG, 2_000_000); // 2 mb
@@ -256,8 +257,7 @@ public class Producer extends KafkaProducer<String, Record> implements Transacti
       // logger.warn("Sending message w/ TxnId: {}", this.txnId);
       firstSend = false;
     }
-    String val = message.toString();
-    return send(new ProducerRecord(topicName, key, val));
+    return send(new ProducerRecord<>(topicName, key, message));
   }
 
 }

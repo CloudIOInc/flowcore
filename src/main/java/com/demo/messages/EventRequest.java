@@ -3,7 +3,7 @@ package com.demo.messages;
 
 import java.util.Map;
 
-public class EventRequest<S extends Settings, C extends Context> {
+public class EventRequest<S extends Settings, C extends Context> implements Event {
 
   public enum TaskTypes {
     Input, Output, Transform

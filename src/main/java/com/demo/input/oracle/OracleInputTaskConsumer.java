@@ -60,7 +60,7 @@ public class OracleInputTaskConsumer extends Consumer {
     // add start offset, end offset
     // success = endoffset + 1
     final long startOffset = firstMessage.getLong("offset");
-    final long endOffset = firstMessage.getLong("offset");
+    final long endOffset = lastMessage.getLong("offset");
 
     monitor.enter();
     try {
