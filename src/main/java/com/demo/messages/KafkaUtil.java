@@ -170,7 +170,7 @@ public class KafkaUtil {
   private static void ensureExecutor() throws Exception {
     if (executor == null) {
       kafkaExecutor = new ScheduledThreadPoolExecutor(100, new IOThreadFactory("cloudio-kafka-executor-"));
-      executor = new IOExecutor(4);
+      executor = new IOExecutor(8);
     }
   }
 

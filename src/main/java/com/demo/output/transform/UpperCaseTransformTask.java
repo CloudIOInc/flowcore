@@ -48,7 +48,7 @@ public class UpperCaseTransformTask {
       //create data topic
       String toTopic = message.getToTopic();
       KafkaUtil.createTopic(KafkaUtil.getAdminClient(), toTopic, topicPartition, false);
-      Map<String, Integer> endOffsets = KafkaUtil.getOffsets(message.getFromTopic(), groupId, topicPartition, false);
+      Map<String, Integer> endOffsets = KafkaUtil.getOffsets(message.getFromTopic(), groupId, topicPartition, true);
       executeInternal(topicName, endOffsets);
       //  postEvent(message, totalRows);
       UpperCaseTranformTaskConsumer inputConsumer = new UpperCaseTranformTaskConsumer(message);

@@ -14,5 +14,6 @@ public class Topics {
   public static final String UPPERCASE_SUB_TASK = "uppercase_sub_task";
 
   public static final String UPPERCASE_GROUP_ID = "transform_group";
+  public static final String MYSQL_GRP_ID = "mysqlOuput_group";
 
 }

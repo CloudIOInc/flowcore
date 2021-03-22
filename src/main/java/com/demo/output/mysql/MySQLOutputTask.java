@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import com.demo.events.BaseConsumer;
 import com.demo.messages.Record;
+import com.demo.messages.Topics;
 import com.demo.output.OutputTask;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -55,7 +56,7 @@ public class MySQLOutputTask extends OutputTask {
   public void execute(MySQLOuputEventRequest eventMessage, String groupId) {
 
     try {
-      kafkaConsumer = new KafkaConsumer<String, Record>(BaseConsumer.getProperties(groupId));
+      kafkaConsumer = new KafkaConsumer<String, Record>(BaseConsumer.getProperties(Topics.MYSQL_GRP_ID));
       message = eventMessage;
 
       settings = eventMessage.getSettings();
