@@ -109,11 +109,11 @@ public class UpperCaseSubTask implements Runnable {
 
           try {
             Record message = record.value();
-            logger.info("Received message: " + message);
+            // logger.info("Received message: " + message);
             dataRecs.add(message);
             lastRecord = record;
             transform(producer, message);
-            logger.info("After transformation message: " + message);
+            // logger.info("After transformation message: " + message);
           } catch (Exception e) {
             logger.error(e.getMessage());
           }
@@ -125,7 +125,7 @@ public class UpperCaseSubTask implements Runnable {
           kafkaConsumer.commitSync(commitMessage);
         }
 
-        logger.info("Posted data successfully!");
+        logger.info("Transfomred - {} data successfully!", dataRecs.size());
       }
     }
   }

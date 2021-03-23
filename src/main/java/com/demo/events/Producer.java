@@ -74,10 +74,8 @@ public class Producer extends KafkaProducer<String, Record> implements Transacti
 
   private static Producer createNewProducer() {
     long count = counter.incrementAndGet();
-    String txnId = "FLOW_NEW_TEST" + "_" + count;
-    if (logger.isDebugEnabled()) {
-      logger.debug("Creating new Producer w/ TxnId: {}", txnId);
-    }
+    String txnId = "SB_INSTANCE_" + "_" + count;
+    logger.debug("Creating new Producer w/ TxnId: {}", txnId);
     return createNewProducer(txnId);
   }
 

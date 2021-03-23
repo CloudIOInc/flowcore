@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.sql.DataSource;
 
@@ -29,6 +28,7 @@ import com.demo.messages.Record;
 import com.demo.messages.Topics;
 import com.demo.output.OutputTask;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 @Service
@@ -129,12 +129,17 @@ public class MySQLOutputTask extends OutputTask {
       long start = System.currentTimeMillis();
       for (int i = 0; i < dataRecs.size(); i++) {
         Record r = dataRecs.get(i);
-        Set<String> keys = r.keySet();
         int colIndex = 1;
-        for (String key : keys) {
+        for (JsonElement column : schema) {
+          JsonObject obj = column.getAsJsonObject();
+          String key = obj.get("fieldName").getAsString();
           Object val = r.get(key);
-          if (val instanceof Number) {
-            ps.setDouble(colIndex, ((BigDecimal) val).doubleValue());
+          if (val instanceof Double) {
+            ps.setDouble(colIndex, (Double) val);
+          } else if (val instanceof Integer) {
+            ps.setInt(colIndex, (Integer) val);
+          } else if (val instanceof BigDecimal) {
+            ps.setBigDecimal(colIndex, (BigDecimal) val);
           } else {
             ps.setString(colIndex, ((String) val));
           }
