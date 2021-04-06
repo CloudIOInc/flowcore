@@ -34,8 +34,7 @@ public abstract class Task<E extends Event, D extends Data, O extends Data> {
 	}
 
 	void subscribeEvent(String eventTopic) {
-		// TODO Auto-generated method stub
-
+		
 	}
 
 	private void handleEvent(E event) { // new event from wf engine
