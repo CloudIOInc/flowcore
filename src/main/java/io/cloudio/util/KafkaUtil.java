@@ -32,7 +32,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.curator.framework.CuratorFramework;
+
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
@@ -67,7 +67,7 @@ public class KafkaUtil {
 	private static ScheduledThreadPoolExecutor statusScheduler;
 	static volatile boolean started = false;
 	public static final Charset UTF8 = StandardCharsets.UTF_8;
-	private static CuratorFramework curatorClient;
+	//private static CuratorFramework curatorClient;
 	private static ScheduledFuture<?> statusMonitorScheduleFuture;
 	private static final Monitor monitor = new Monitor();
 

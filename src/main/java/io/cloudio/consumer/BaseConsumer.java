@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.CooperativeStickyAssignor;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -43,6 +44,7 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Monitor;
 
 import io.cloudio.exceptions.CloudIOException;
+import io.cloudio.task.Data;
 import io.cloudio.util.ErrorHandler;
 import io.cloudio.util.Notification;
 
@@ -361,7 +363,7 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
     }
   }
 
-  protected abstract List<V> poll() throws Throwable;
+  protected abstract ConsumerRecords<K, V> poll() throws Throwable;
 
   public void restartBeforeNextPoll() {
     restart.set(true);
@@ -544,6 +546,9 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
   public KafkaConsumer<K, V> getConsumer() {
     return consumer;
   }
+
+  
+  
   
   
 

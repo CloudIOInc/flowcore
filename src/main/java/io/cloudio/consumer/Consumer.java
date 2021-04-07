@@ -1,13 +1,18 @@
 package io.cloudio.consumer;
 
+import java.time.Duration;
 import java.util.Collection;
-import java.util.List;
 
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import io.cloudio.task.Data;
 
 public class Consumer extends BaseConsumer<String, Data> {
+
+	private static Logger logger = LogManager.getLogger(Consumer.class);
 
 	public Consumer(String groupId, Collection<String> topicNames) {
 		super(groupId, topicNames);
@@ -16,8 +21,7 @@ public class Consumer extends BaseConsumer<String, Data> {
 
 	@Override
 	protected KafkaConsumer<String, Data> createConsumer() {
-		// TODO Auto-generated method stub
-		return null;
+		return new KafkaConsumer<String, Data>(properties);
 	}
 
 	@Override
@@ -26,16 +30,23 @@ public class Consumer extends BaseConsumer<String, Data> {
 		return null;
 	}
 
+	//CHANGED : Return type changed to ConsumerRecords so that task will commit if 
+	//record handle is successful
 	@Override
-	public List<Data> poll() throws Throwable {
-		// TODO Auto-generated method stub
-		return null;
+	public ConsumerRecords<String, Data> poll() throws Throwable {
 		
+		ConsumerRecords<String, Data> records = consumer.poll(Duration.ofSeconds(60));
+		return records;
+
 	}
+
+	
+	
+	
 
 	public void start() {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 }
