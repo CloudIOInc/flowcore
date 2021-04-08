@@ -3,12 +3,15 @@ package io.cloudio.consumer;
 import java.time.Duration;
 import java.util.Collection;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import io.cloudio.task.Data;
+import io.cloudio.util.JsonDeserializer;
 
 public class Consumer extends BaseConsumer<String, Data> {
 
@@ -20,8 +23,16 @@ public class Consumer extends BaseConsumer<String, Data> {
 	}
 
 	@Override
-	protected KafkaConsumer<String, Data> createConsumer() {
-		return new KafkaConsumer<String, Data>(properties);
+	public KafkaConsumer<String, Data> createConsumer() {
+		//override value.deserializer
+		properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class.getName());
+		//consumer = new KafkaConsumer<String, Data>(properties);
+		
+		
+		
+		consumer =  new KafkaConsumer<String, Data>(properties, new StringDeserializer(),
+		        new JsonDeserializer<Data>(Data.class));
+		return consumer;
 	}
 
 	@Override
@@ -35,7 +46,7 @@ public class Consumer extends BaseConsumer<String, Data> {
 	@Override
 	public ConsumerRecords<String, Data> poll() throws Throwable {
 		
-		ConsumerRecords<String, Data> records = consumer.poll(Duration.ofSeconds(60));
+		ConsumerRecords<String, Data> records = consumer.poll(Duration.ofSeconds(10));
 		return records;
 
 	}
@@ -44,9 +55,6 @@ public class Consumer extends BaseConsumer<String, Data> {
 	
 	
 
-	public void start() {
-		// TODO Auto-generated method stub
-
-	}
+	
 
 }

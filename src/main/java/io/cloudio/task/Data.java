@@ -1,9 +1,9 @@
 
 package io.cloudio.task;
 
-import java.util.HashMap;
+import java.util.TreeMap;
 
-public class Data extends HashMap<String, Object> {
+public class Data extends TreeMap<String, Object> {
 
   public enum EventType {
     End, Data

@@ -131,7 +131,7 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
     // override
   }
 
-  protected boolean canRun() {
+  public boolean canRun() {
     return consumer != null && !closed;
   }
 
@@ -304,7 +304,11 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
     closed = true;
     wakeup();
   }
-
+  
+  public void start() {
+	closed = false;
+  }
+  
   protected abstract KafkaConsumer<K, V> createConsumer();
 
   public String getClientId() {
@@ -479,7 +483,7 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
 
   
 
-  protected void subscribe() {
+  public void subscribe() {
     ConsumerRebalanceListener consumerRebalanceListener = new ConsumerRebalanceListener() {
       @Override
       public void onPartitionsAssigned(Collection<TopicPartition> partitions) {

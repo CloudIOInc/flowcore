@@ -20,11 +20,14 @@ import io.cloudio.consumer.Consumer;
 import io.cloudio.consumer.EventConsumer;
 import io.cloudio.messages.Settings;
 import io.cloudio.producer.Producer;
+import io.cloudio.util.GsonUtil;
 
 public abstract class Task<E extends Event, D extends Data, O extends Data> {
 	protected E event;
 	private String taskCode;
 	private String eventTopic;
+
+	// TODO: FIXME : EventConsumer and Consumer should run in thread ??
 	private Consumer dataConsumer;
 	private EventConsumer eventConsumer;
 	private Producer producer;
@@ -35,7 +38,7 @@ public abstract class Task<E extends Event, D extends Data, O extends Data> {
 	Task(String taskCode) {
 		this.taskCode = taskCode;
 		this.eventTopic = taskCode + "-events";
-		this.groupId = taskCode + "-test1";
+		this.groupId = taskCode + "-grId";
 	}
 
 	void onStart(Event event) {
@@ -49,16 +52,19 @@ public abstract class Task<E extends Event, D extends Data, O extends Data> {
 	public abstract void handleData(List<Data> data);
 
 	public void start() {
+
+		producer = Producer.get();
+
 		eventConsumer = new EventConsumer(groupId, Collections.singleton(eventTopic));
-		eventConsumer.createConsumer(); //TODO : Revisit
-		eventConsumer.subscribe();//TODO: Revisit
+		eventConsumer.createConsumer(); // TODO : Revisit
+		eventConsumer.subscribe();// TODO: Revisit
 		subscribeEvent(eventTopic); // listen to workflow engine for instructions
 	}
 
 	void subscribeEvent(String eventTopic) {
 		Throwable ex = null;
-		// TODO: revisit this
-		while (true) {
+
+		while (eventConsumer.canRun()) {
 			try {
 				ConsumerRecords<String, String> events = eventConsumer.poll();
 				// TODO : Can below code go in consumer ??
@@ -80,11 +86,8 @@ public abstract class Task<E extends Event, D extends Data, O extends Data> {
 							if (eventSting == null) {
 								continue;
 							}
-							Gson gson = new Gson(); //TODO: hanlde this in VALUE_DESERIALIZER_CLASS_CONFIG of consumer??
-							Event<Settings> event = gson.fromJson(eventSting, Event.class); //TODO : FIXME : convert JSON string to Event object
-							
-							// TODO : Expect only one event ?
-							handleEvent(event);
+							Event<Settings> eventObj = GsonUtil.getEventObject(eventSting);
+							handleEvent(eventObj);
 						}
 
 						try {
@@ -118,10 +121,10 @@ public abstract class Task<E extends Event, D extends Data, O extends Data> {
 					}
 				}
 			} catch (Throwable e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				logger.catching(e);
 			}
 		}
+		logger.debug("Stopped event consumer for {} task " + taskCode);
 	}
 
 	private void handleEvent(Event<Settings> event) { // new event from wf engine
@@ -146,13 +149,18 @@ public abstract class Task<E extends Event, D extends Data, O extends Data> {
 	protected void unsubscribeData() {
 		dataConsumer.close();
 		eventConsumer.start();
+		subscribeEvent(eventTopic);
 	}
 
 	private void subscribeData(String fromTopic) {
-
 		Throwable ex = null;
 		// TODO : handle while -> true
-		while (true) {
+		if (dataConsumer == null) {
+			dataConsumer = new Consumer(groupId + "n3", Collections.singleton(fromTopic));
+			dataConsumer.createConsumer();
+			dataConsumer.subscribe();
+		}
+		while (dataConsumer.canRun()) {
 			try {
 				ConsumerRecords<String, Data> dataRecords = dataConsumer.poll();
 				// TODO : Can below code go in consumer ??
@@ -174,10 +182,8 @@ public abstract class Task<E extends Event, D extends Data, O extends Data> {
 							if (data == null) {
 								continue;
 							}
-							// TODO : Expect only one event ?
 							list.add(data);
 						}
-
 						try {
 
 							if (list.size() > 0) {
@@ -213,11 +219,10 @@ public abstract class Task<E extends Event, D extends Data, O extends Data> {
 					}
 				}
 			} catch (Throwable e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				logger.catching(e);
 			}
 		}
-
+		logger.debug("Stopped data consumer for {} task " + taskCode);
 	}
 
 	private void unsubscribeEvent() {

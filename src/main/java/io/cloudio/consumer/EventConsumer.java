@@ -23,6 +23,7 @@ public class EventConsumer extends BaseConsumer<String, String> {
 
 	@Override
 	public KafkaConsumer<String, String> createConsumer() {
+		//TODO: Update properties obj with deserilizer for events
 		consumer = new KafkaConsumer<String, String>(properties);
 		return consumer;
 	}
@@ -43,13 +44,7 @@ public class EventConsumer extends BaseConsumer<String, String> {
 	}
 
 	
-	public void subscribe() {
-		super.subscribe();
-	}
 	
 
-	public void start() {
-		// TODO Auto-generated method stub
-
-	}
+	
 }
