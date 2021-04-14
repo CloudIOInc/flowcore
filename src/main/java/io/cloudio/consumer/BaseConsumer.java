@@ -15,7 +15,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -44,11 +43,10 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Monitor;
 
 import io.cloudio.exceptions.CloudIOException;
-import io.cloudio.task.Data;
 import io.cloudio.util.ErrorHandler;
 import io.cloudio.util.Notification;
 
-public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
+public abstract class BaseConsumer<K, V> implements Runnable, AutoCloseable {
   private static Logger logger = LogManager.getLogger(BaseConsumer.class);
 
   public static Properties getProperties(String groupId) {
@@ -94,15 +92,12 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
   private AtomicBoolean resume = new AtomicBoolean(false);
   protected Collection<String> topicNames;
   protected Pattern topicPattern;
-  
-  
-
 
   public BaseConsumer(String groupId) {
     this.groupId = groupId;
     this.properties = getProperties(groupId);
     this.properties.put(ConsumerConfig.CLIENT_ID_CONFIG, getClientId());
-    
+
   }
 
   public BaseConsumer(String groupId, Collection<String> topicNames) {
@@ -170,7 +165,7 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
         commitSync(revoked);
         revoked.forEach((tp, om) -> {
           toBeCommitted.remove(tp);
-          
+
         });
       } catch (RebalanceInProgressException e) {
         freeup = false;
@@ -180,13 +175,13 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
         // ignore
         revoked.forEach((tp, om) -> {
           toBeCommitted.remove(tp);
-          
+
         });
         logger.error("{}: Error commiting revoked partitions", this.getName());
         logger.catching(e);
       }
     }
-   
+
   }
 
   private void checkToBePausedOrResumed() {
@@ -260,12 +255,12 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
     beforePause(pausedPartitions);
     consumer.pause(pausedPartitions);
     afterPause(pausedPartitions);
-    
+
   }
 
   private void resumeConsumer() {
     logger.info("{}: Resuming consumer", getName());
-    
+
     Set<TopicPartition> assignment = consumer.assignment();
     Set<TopicPartition> activePausedPartitions = pausedPartitions.stream()
         .filter(tp -> !pausedSet.contains(tp) && assignment.contains(tp))
@@ -304,11 +299,11 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
     closed = true;
     wakeup();
   }
-  
+
   public void start() {
-	closed = false;
+    closed = false;
   }
-  
+
   protected abstract KafkaConsumer<K, V> createConsumer();
 
   public String getClientId() {
@@ -373,8 +368,6 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
     restart.set(true);
   }
 
-  
-
   @Override
   public final void run() {
     if (consumer != null) {
@@ -420,7 +413,7 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
       logger.warn("Closing {} Consumer", getName());
       closeQuietly(consumer);
       logger.warn("Closed {} Consumer", getName());
-      
+
     }
 
   }
@@ -480,8 +473,6 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
       monitor.leave();
     }
   }
-
-  
 
   public void subscribe() {
     ConsumerRebalanceListener consumerRebalanceListener = new ConsumerRebalanceListener() {
@@ -550,10 +541,5 @@ public abstract class BaseConsumer<K, V> implements Runnable , AutoCloseable{
   public KafkaConsumer<K, V> getConsumer() {
     return consumer;
   }
-
-  
-  
-  
-  
 
 }

@@ -1,3 +1,4 @@
+
 package io.cloudio.util;
 
 import java.lang.reflect.Type;
@@ -5,18 +6,28 @@ import java.lang.reflect.Type;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import io.cloudio.messages.DBSettings;
 import io.cloudio.messages.Settings;
 import io.cloudio.task.Event;
 
 public class GsonUtil {
 
-	public static Event<Settings> getEventObject(String json) {
+  static Gson gson = new Gson();
 
-		Gson gson = new Gson();
-		Type fooType = new TypeToken<Event<Settings>>() {
-		}.getType();
+  public static Event<Settings> getEventObject(String json) {
 
-		Event<Settings> event = gson.fromJson(json, fooType);
-		return event;
-	}
+    Type settingsType = new TypeToken<Event<Settings>>() {
+    }.getType();
+
+    Event<Settings> event = gson.fromJson(json, settingsType);
+    return event;
+  }
+
+  public static Event<? extends Settings> getDBSettingsEvent(String json) {
+    Type dbSettingsType = new TypeToken<Event<DBSettings>>() {
+    }.getType();
+
+    Event<DBSettings> event = gson.fromJson(json, dbSettingsType);
+    return event;
+  }
 }
