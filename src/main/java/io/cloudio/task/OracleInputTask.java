@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.logging.log4j.LogManager;
@@ -12,15 +13,15 @@ import org.apache.logging.log4j.Logger;
 
 import io.cloudio.consumer.EventConsumer;
 import io.cloudio.exceptions.CloudIOException;
-import io.cloudio.messages.DBEvent;
-import io.cloudio.messages.DBSettings;
+import io.cloudio.messages.OracleEvent;
+import io.cloudio.messages.OracleSettings;
 import io.cloudio.messages.Settings;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.GsonUtil;
 import oracle.jdbc.driver.OracleConnection;
 import oracle.jdbc.pool.OracleDataSource;
 
-public abstract class OracleInputTask extends InputTask<Event<DBSettings>, Data> {
+public abstract class OracleInputTask extends InputTask<Event<OracleSettings>, Data> {
   private static final String ORACLE_SUBTASK_STATUS = "oracle_subtask_status";
   private static final String ORACLE_SUB_TASKS = "oracle_sub_tasks";
   private EventConsumer subTaskConsumer;
@@ -35,6 +36,8 @@ public abstract class OracleInputTask extends InputTask<Event<DBSettings>, Data>
   }
 
   public abstract String getCountSql(String tableName);
+
+  public abstract List<Data> queryData(OracleEvent<OracleSettings> event);
 
   public void start() {
     super.start();
@@ -68,15 +71,15 @@ public abstract class OracleInputTask extends InputTask<Event<DBSettings>, Data>
   }
 
   @Override
-  public void handleData(Event<DBSettings> event) {
+  public void handleData(Event<OracleSettings> event) {
     isLeader = true;
-    DBSettings s = event.getSettings();
+    OracleSettings s = event.getSettings();
     createSubTasks(s);
     subscribeParallelEvents();
 
   }
 
-  private void createSubTasks(DBSettings settings) {
+  private void createSubTasks(OracleSettings settings) {
     try {
       String tableName = settings.getTableName();
       int fetchSize = settings.getFetchSize();
@@ -97,19 +100,19 @@ public abstract class OracleInputTask extends InputTask<Event<DBSettings>, Data>
     }
   }
 
-  private void createSubTaskEvents(int subTasks, DBSettings settings) throws Exception {
+  private void createSubTaskEvents(int subTasks, OracleSettings settings) throws Exception {
     Producer producer = Producer.get();
     producer.beginTransaction();
     for (int i = 1; i <= subTasks; i++) {
-      DBEvent event = getDBEvent(subTasks, i);
+      OracleEvent<OracleSettings> event = getDBEvent(subTasks, i);
       producer.send(ORACLE_SUB_TASKS, event);
     }
     producer.commitTransaction();
 
   }
 
-  private DBEvent getDBEvent(int subTasks, int i) {
-    DBEvent e = new DBEvent();
+  private OracleEvent<OracleSettings> getDBEvent(int subTasks, int i) {
+    OracleEvent<OracleSettings> e = new OracleEvent<OracleSettings>();
     e.setPageNo(1);
     e.setTotalPages(subTasks);
     e.setFromTopic(event.getToTopic());
@@ -126,7 +129,7 @@ public abstract class OracleInputTask extends InputTask<Event<DBSettings>, Data>
     }
   }
 
-  private Connection getConnection(DBSettings settings) throws Exception {
+  private Connection getConnection(OracleSettings settings) throws Exception {
     Properties info = new Properties();
     info.put(OracleConnection.CONNECTION_PROPERTY_USER_NAME, settings.getUserName());
     info.put(OracleConnection.CONNECTION_PROPERTY_PASSWORD, settings.getPassword());

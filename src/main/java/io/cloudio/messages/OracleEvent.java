@@ -3,7 +3,7 @@ package io.cloudio.messages;
 
 import io.cloudio.task.Event;
 
-public class DBEvent extends Event<DBSettings> {
+public class OracleEvent<DBSettings> extends Event<Settings> {
   private int totalPages;
   private int pageNo;
   private int limit;

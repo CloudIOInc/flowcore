@@ -1,7 +1,7 @@
 
 package io.cloudio.messages;
 
-public class DBSettings extends Settings {
+public class OracleSettings extends Settings {
 
   private String jdbcUrl;
   private String userName;

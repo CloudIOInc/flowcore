@@ -6,7 +6,7 @@ import java.lang.reflect.Type;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-import io.cloudio.messages.DBSettings;
+import io.cloudio.messages.OracleSettings;
 import io.cloudio.messages.Settings;
 import io.cloudio.task.Event;
 
@@ -24,10 +24,10 @@ public class GsonUtil {
   }
 
   public static Event<? extends Settings> getDBSettingsEvent(String json) {
-    Type dbSettingsType = new TypeToken<Event<DBSettings>>() {
+    Type dbSettingsType = new TypeToken<Event<OracleSettings>>() {
     }.getType();
 
-    Event<DBSettings> event = gson.fromJson(json, dbSettingsType);
+    Event<OracleSettings> event = gson.fromJson(json, dbSettingsType);
     return event;
   }
 }
