@@ -11,6 +11,8 @@ public class DBSettings extends Settings {
   private String lastUpdateColumn;
   private String idColumn;
 
+  private int fetchSize;
+
   public String getJdbcUrl() {
     return jdbcUrl;
   }
@@ -57,6 +59,14 @@ public class DBSettings extends Settings {
 
   public void setIdColumn(String idColumn) {
     this.idColumn = idColumn;
+  }
+
+  public int getFetchSize() {
+    return fetchSize;
+  }
+
+  public void setFetchSize(int fetchSize) {
+    this.fetchSize = fetchSize;
   }
 
 }

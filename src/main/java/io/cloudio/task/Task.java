@@ -31,7 +31,7 @@ public abstract class Task<E extends Event<?>, D extends Data, O extends Data> {
   private Producer producer;
   protected String groupId;
 
-  private static Logger logger = LogManager.getLogger(Consumer.class);
+  private static Logger logger = LogManager.getLogger(Task.class);
 
   Task(String taskCode) {
     this.taskCode = taskCode;
