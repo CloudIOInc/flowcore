@@ -65,6 +65,7 @@ public abstract class Task<E extends Event<?>, D extends Data, O extends Data> {
 
     try {
       ConsumerRecords<String, String> events = eventConsumer.poll();
+      // if there is no event we should trigger subscribeEvent in loop
       // TODO : Can below code go in consumer ??
       if (events != null && events.count() > 0) {
         for (TopicPartition partition : events.partitions()) {

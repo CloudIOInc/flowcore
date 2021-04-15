@@ -21,7 +21,7 @@ import io.cloudio.producer.Producer;
 
 public abstract class InputTask<E extends Event<? extends Settings>, O extends Data> {
   protected E event;
-  private String taskCode;
+  protected String taskCode;
   protected String eventTopic;
 
   private EventConsumer eventConsumer;

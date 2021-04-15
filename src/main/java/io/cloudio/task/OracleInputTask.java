@@ -8,6 +8,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.InterruptException;
+import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -15,7 +21,6 @@ import io.cloudio.consumer.EventConsumer;
 import io.cloudio.exceptions.CloudIOException;
 import io.cloudio.messages.OracleEvent;
 import io.cloudio.messages.OracleSettings;
-import io.cloudio.messages.Settings;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.GsonUtil;
 import oracle.jdbc.driver.OracleConnection;
@@ -61,12 +66,71 @@ public abstract class OracleInputTask extends InputTask<Event<OracleSettings>, D
   }
 
   private void subscribeSubTaskStatusEvent(String oracleSubtaskStatus) {
-    // TODO Auto-generated method stub
 
   }
 
   private void subscribeSubTaskEvent(String oracleSubTasks) {
-    // TODO Auto-generated method stub
+
+    Throwable ex = null;
+
+    try {
+      ConsumerRecords<String, String> events = subTaskConsumer.poll();
+      if (events != null && events.count() > 0) {
+        for (TopicPartition partition : events.partitions()) {
+          List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
+          if (partitionRecords.size() == 0) {
+            continue;
+          }
+          if (logger.isInfoEnabled()) {
+            logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
+                partitionRecords.get(0).offset(),
+                partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
+          }
+
+          for (ConsumerRecord<String, String> record : partitionRecords) {
+            String eventSting = record.value();
+            if (eventSting == null) {
+              continue;
+            }
+            OracleEvent<OracleSettings> eventObj = getEvent(eventSting);
+            List<Data> data = queryData(eventObj);
+            post(data);
+          }
+
+          try {
+
+            if (partitionRecords.size() > 0) {
+              long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
+              subTaskConsumer.commitSync(
+                  Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
+            }
+          } catch (WakeupException | InterruptException e) {
+            throw e;
+          } catch (Throwable e) {
+            logger.catching(e);
+            if (ex == null) {
+              ex = e;
+            }
+            try {
+              logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
+                  partitionRecords.get(0).offset(),
+                  partitionRecords.get(partitionRecords.size() - 1).offset(),
+                  partition.toString());
+
+              subTaskConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
+            } catch (Throwable e1) {
+              subTaskConsumer.restartBeforeNextPoll();
+            }
+          }
+        }
+        if (ex != null) {
+          throw ex;
+        }
+      }
+    } catch (Throwable e) {
+      logger.catching(e);
+    }
+    logger.debug("Stopped event consumer for {} task " + taskCode);
 
   }
 
@@ -143,7 +207,7 @@ public abstract class OracleInputTask extends InputTask<Event<OracleSettings>, D
   }
 
   @Override
-  protected Event<? extends Settings> getEvent(String eventJson) {
+  protected OracleEvent<OracleSettings> getEvent(String eventJson) {
     return GsonUtil.getDBSettingsEvent(eventJson);
   }
 
