@@ -10,6 +10,7 @@ import io.cloudio.messages.OracleEvent;
 import io.cloudio.messages.OracleSettings;
 import io.cloudio.messages.Settings;
 import io.cloudio.task.Event;
+import io.cloudio.task.TransformSettings;
 
 public class GsonUtil {
 
@@ -24,6 +25,15 @@ public class GsonUtil {
     return event;
   }
 
+  public static Event<Settings> getTransformEventObject(String json) {
+
+	    Type settingsType = new TypeToken<Event<TransformSettings>>() {
+	    }.getType();
+
+	    Event<Settings> event = gson.fromJson(json, settingsType);
+	    return event;
+	  }
+  
   public static OracleEvent<OracleSettings> getDBSettingsEvent(String json) {
     Type dbSettingsType = new TypeToken<OracleEvent<OracleSettings>>() {
     }.getType();
