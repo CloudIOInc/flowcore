@@ -9,6 +9,7 @@ import com.google.gson.reflect.TypeToken;
 import io.cloudio.messages.OracleEvent;
 import io.cloudio.messages.OracleSettings;
 import io.cloudio.messages.Settings;
+import io.cloudio.messages.TaskRequest;
 import io.cloudio.task.Event;
 import io.cloudio.task.TransformSettings;
 
@@ -25,12 +26,12 @@ public class GsonUtil {
     return event;
   }
 
-  public static Event<Settings> getTransformEventObject(String json) {
+  public static TaskRequest<Settings> getTransformTaskRequest(String json) {
 
-	    Type settingsType = new TypeToken<Event<TransformSettings>>() {
+	    Type settingsType = new TypeToken<TaskRequest<TransformSettings>>() {
 	    }.getType();
 
-	    Event<Settings> event = gson.fromJson(json, settingsType);
+	    TaskRequest<Settings> event = gson.fromJson(json, settingsType);
 	    return event;
 	  }
   
