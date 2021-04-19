@@ -22,22 +22,26 @@ import io.cloudio.util.GsonUtil;
 
 public abstract class TransformTask<R extends TaskRequest<?>> {
 
-	protected R taskRequest;
+	public R taskRequest;
 	private String taskCode;
-	protected String eventTopic;
+	private String eventTopic;
 
 	// TODO: FIXME : EventConsumer and Consumer should run in thread ??
 	private Consumer dataConsumer;
 	private EventConsumer eventConsumer;
 	private Producer producer;
-	protected String groupId;
+	private String eventConsumerGroupId;
+	private String dataConsumerGroupId;
+	
 
 	private static Logger logger = LogManager.getLogger(TransformTask.class);
 
 	public TransformTask(String taskCode) {
+		
 		this.taskCode = taskCode;
 		this.eventTopic = taskCode + "-events";
-		this.groupId = taskCode + "-grId";
+		this.eventConsumerGroupId = taskCode + "-eventGrId";
+		this.dataConsumerGroupId = taskCode + "-dataGrId";
 	}
 
 	public abstract List<Data> onData(TaskRequest<?> E, List<Data> D);
@@ -51,10 +55,10 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
 	}
 
 	public void start() {
-
+		logger.info("TransformTask : start");
 		producer = Producer.get();
 
-		eventConsumer = new EventConsumer(groupId, Collections.singleton(eventTopic));
+		eventConsumer = new EventConsumer(eventConsumerGroupId, Collections.singleton(eventTopic));
 		eventConsumer.createConsumer(); // TODO : Revisit
 		eventConsumer.subscribe();// TODO: Revisit
 		subscribeEvent(eventTopic); // listen to workflow engine for instructions
@@ -66,7 +70,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
 
 		try {
 			while(eventConsumer.canRun()) {
-				
+				logger.info("eventConsumer poll() calling");
 				ConsumerRecords<String, String> events = eventConsumer.poll();
 				// if there is no event we should trigger subscribeEvent in loop
 				// TODO : Can below code go in consumer ??
@@ -77,13 +81,14 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
 							continue;
 						}
 						if (logger.isInfoEnabled()) {
-							logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
+							logger.info("EventConsumer : Got {} events between {} & {} in {}", partitionRecords.size(),
 									partitionRecords.get(0).offset(),
 									partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
 						}
 
 						for (ConsumerRecord<String, String> record : partitionRecords) {
 							String eventSting = record.value();
+							
 							if (eventSting == null) {
 								continue;
 							}
@@ -162,12 +167,13 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
 		Throwable ex = null;
 		// TODO : handle while -> true
 		if (dataConsumer == null) {
-			dataConsumer = new Consumer(groupId + "n3", Collections.singleton(fromTopic));
+			dataConsumer = new Consumer(dataConsumerGroupId, Collections.singleton(fromTopic));
 			dataConsumer.createConsumer();
 			dataConsumer.subscribe();
 		}
 		while (dataConsumer.canRun()) {
 			try {
+				logger.debug("eventConsumer poll() calling");
 				ConsumerRecords<String, Data> dataRecords = dataConsumer.poll();
 				
 				// TODO : Can below code go in consumer ??
@@ -178,7 +184,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
 							continue;
 						}
 						if (logger.isInfoEnabled()) {
-							logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
+							logger.info("DataConsumer : Got {} events between {} & {} in {}", partitionRecords.size(),
 									partitionRecords.get(0).offset(),
 									partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
 						}
@@ -200,7 +206,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
 							
 							if (partitionRecords.size() > 0) {
 								long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-								eventConsumer.commitSync(
+								dataConsumer.commitSync(
 										Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
 							}
 						} catch (WakeupException | InterruptException e) {

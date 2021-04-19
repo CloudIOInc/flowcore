@@ -2,7 +2,9 @@ package io.cloudio.task;
 
 import java.util.List;
 
-public abstract class OutputTask extends Task<Event, Data, Data>{
+import io.cloudio.messages.OutputSettings;
+
+public abstract class OutputTask extends Task<Event<OutputSettings>, Data, Data>{
 
 	public OutputTask(String taskCode) {
 		super(taskCode);
