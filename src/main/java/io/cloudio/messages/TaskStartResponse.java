@@ -11,7 +11,7 @@ public class TaskStartResponse {
   private String startDate;
   private String taskType;
   private String fromTopic;
-  private List<Map<Integer, Integer>> fromTopicStartOffsets;
+  private List<Map<String, Integer>> fromTopicStartOffsets;
   private String toTopic;
   private String wfInstUid;
   private String wfUid;
@@ -56,11 +56,11 @@ public class TaskStartResponse {
     this.fromTopic = fromTopic;
   }
 
-  public List<Map<Integer, Integer>> getFromTopicStartOffsets() {
+  public List<Map<String, Integer>> getFromTopicStartOffsets() {
     return fromTopicStartOffsets;
   }
 
-  public void setFromTopicStartOffsets(List<Map<Integer, Integer>> fromTopicStartOffsets) {
+  public void setFromTopicStartOffsets(List<Map<String, Integer>> fromTopicStartOffsets) {
     this.fromTopicStartOffsets = fromTopicStartOffsets;
   }
 

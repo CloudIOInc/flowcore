@@ -1,19 +1,11 @@
 
 package io.cloudio.util;
 
-import java.lang.reflect.Type;
-import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
-import java.util.Date;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.reflect.TypeToken;
-
-
 
 public class Util {
   private static Gson gsonMessageDeserializer, gsonDeserializer, gsonSerializerSkipNulls, gsonSerializer,
@@ -105,6 +97,13 @@ public class Util {
 
   static Gson gson = new Gson();
 
- 
+  public static final void closeQuietly(AutoCloseable autoClosable) {
+    if (autoClosable != null) {
+      try {
+        autoClosable.close();
+      } catch (Throwable e) {
+      }
+    }
+  }
 
 }

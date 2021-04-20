@@ -241,6 +241,10 @@ public class Producer extends KafkaProducer<String, Object> implements Transacti
     return send(topicName, null, message);
   }
 
+  public Future<RecordMetadata> send(String topicName, Integer partition, String key, Object message) throws Exception {
+    return send(new ProducerRecord<>(topicName, partition, key, message));
+  }
+
   public void superClose() {
     try {
       super.flush();

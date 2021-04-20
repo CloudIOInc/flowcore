@@ -37,16 +37,11 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.ThreadContext;
 
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Monitor;
 
-import io.cloudio.exceptions.CloudIOException;
-import io.cloudio.util.ErrorHandler;
-import io.cloudio.util.Notification;
-
-public abstract class BaseConsumer<K, V> implements Runnable, AutoCloseable {
+public abstract class BaseConsumer<K, V> implements AutoCloseable {
   private static Logger logger = LogManager.getLogger(BaseConsumer.class);
 
   public static Properties getProperties(String groupId) {
@@ -96,7 +91,7 @@ public abstract class BaseConsumer<K, V> implements Runnable, AutoCloseable {
   public BaseConsumer(String groupId) {
     this.groupId = groupId;
     this.properties = getProperties(groupId);
-    this.properties.put(ConsumerConfig.CLIENT_ID_CONFIG, getClientId());
+    this.properties.put(ConsumerConfig.CLIENT_ID_CONFIG, getClientId(groupId));
 
   }
 
@@ -306,8 +301,8 @@ public abstract class BaseConsumer<K, V> implements Runnable, AutoCloseable {
 
   protected abstract KafkaConsumer<K, V> createConsumer();
 
-  public String getClientId() {
-    return "consumbers_" + "-" + this.getClass().getSimpleName();
+  public String getClientId(String groupId) {
+    return "io_consumers_" + groupId + "-" + this.getClass().getSimpleName();
   }
 
   public abstract String getName();
@@ -366,56 +361,6 @@ public abstract class BaseConsumer<K, V> implements Runnable, AutoCloseable {
 
   public void restartBeforeNextPoll() {
     restart.set(true);
-  }
-
-  @Override
-  public final void run() {
-    if (consumer != null) {
-      throw CloudIOException.with("{}: Consumer already running!", getName());
-    }
-    ThreadContext.put("instanceIdentifier", "[consumers]");
-    logger.info("{}: Starting Consumer...", getName());
-
-    try {
-      consumer = createConsumer();
-      subscribe();
-      while (canRun()) {
-        try {
-          checkRestart();
-
-          checkResubscribe();
-
-          checkPauseOrResume(); // this is throwing WakeupException when trying to commit the offsets before
-                               // resume
-
-          poll();
-          errorCount = 0;
-        } catch (WakeupException | InterruptException e) {
-          // logger.warn("{} wokeup/interrupted...", getName());
-        } catch (Throwable e) {
-          errorCount++;
-          logger.catching(e);
-          Notification.error("Consumer", getName(), ErrorHandler.getMessage(e), ErrorHandler.getMessageStackHTML(e));
-          if (errorCount > 10) {
-            Notification.error("Consumer", getName(), "Too many errors! Closing consumer " + getName(), null);
-            throw e;
-          }
-        }
-      }
-      if (consumer != null) {
-        // commit any pending commits in toBeCommitted
-        Set<TopicPartition> assignments = consumer.assignment();
-        doCommitBeforeNextPoll(assignments);
-      }
-    } catch (Throwable e) {
-      logger.catching(e);
-    } finally {
-      logger.warn("Closing {} Consumer", getName());
-      closeQuietly(consumer);
-      logger.warn("Closed {} Consumer", getName());
-
-    }
-
   }
 
   public void setCountDownLatch(CountDownLatch latch) {
@@ -532,7 +477,7 @@ public abstract class BaseConsumer<K, V> implements Runnable, AutoCloseable {
     }
   }
 
-  protected void wakeup() {
+  public void wakeup() {
     if (consumer != null) {
       consumer.wakeup();
     }

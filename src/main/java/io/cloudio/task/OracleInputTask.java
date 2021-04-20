@@ -1,16 +1,20 @@
 
 package io.cloudio.task;
 
-import java.sql.Connection;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Properties;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.WakeupException;
@@ -19,173 +23,249 @@ import org.apache.logging.log4j.Logger;
 
 import io.cloudio.consumer.EventConsumer;
 import io.cloudio.exceptions.CloudIOException;
-import io.cloudio.messages.OracleEvent;
 import io.cloudio.messages.OracleSettings;
+import io.cloudio.messages.OracleTaskRequest;
+import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.GsonUtil;
-import oracle.jdbc.driver.OracleConnection;
-import oracle.jdbc.pool.OracleDataSource;
+import io.cloudio.util.SchemaReader;
+import io.cloudio.util.Util;
 
-public abstract class OracleInputTask extends InputTask<Event<OracleSettings>, Data> {
+public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettings>, Data> {
+  private static Logger logger = LogManager.getLogger(OracleInputTask.class);
   private static final String ORACLE_SUBTASK_STATUS = "oracle_subtask_status";
   private static final String ORACLE_SUB_TASKS = "oracle_sub_tasks";
   private EventConsumer subTaskConsumer;
   private EventConsumer subTaskStatuseventConsumer;
-  private static Logger logger = LogManager.getLogger(OracleInputTask.class);
+  private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
+  static ExecutorService executorService = Executors.newFixedThreadPool(8);
+  private String subTaskTopic;
+  private String subTaskStatusTopic;
+  private Integer totalSubtask;
+  private AtomicInteger subtask_recv_count = new AtomicInteger(0);
+  SchemaReader schemas = new SchemaReader();
 
-  private boolean isLeader = false;
-
-  OracleInputTask(String taskCode) {
+  protected OracleInputTask(String taskCode) {
     super(taskCode);
 
   }
 
-  public abstract String getCountSql(String tableName);
+  public abstract Integer getCountSql(OracleSettings settings, String tableName) throws Exception;
 
-  public abstract List<Data> queryData(OracleEvent<OracleSettings> event);
+  public abstract List<Data> queryData(OracleTaskRequest<OracleSettings> event) throws Exception;
 
-  public void start() {
-    super.start();
-
-    subscribeParallelEvents();
-
+  public void start(String bootStrapServer, int partition) throws Exception {
+    super.start(bootStrapServer, partition);
+    Runtime.getRuntime().addShutdownHook(new Thread() {
+      @Override
+      public void run() {
+        try {
+          executorService.shutdown();
+          executorService.awaitTermination(1, TimeUnit.MINUTES);
+          Thread.sleep(1 * 60 * 1000);
+          Util.closeQuietly(subTaskConsumer);
+          Util.closeQuietly(subTaskStatuseventConsumer);
+          Util.closeQuietly(eventConsumer);
+        } catch (Exception e) {
+          //ignore
+        }
+      }
+    });
   }
 
-  private void subscribeParallelEvents() {
-    subTaskConsumer = new EventConsumer(groupId, Collections.singleton(ORACLE_SUB_TASKS));
-    subTaskConsumer.createConsumer();
-    subTaskConsumer.subscribe();
-    subscribeSubTaskEvent(ORACLE_SUB_TASKS);
-
-    if (isLeader) {
-      subTaskStatuseventConsumer = new EventConsumer(groupId, Collections.singleton(ORACLE_SUBTASK_STATUS));
-      subTaskStatuseventConsumer.createConsumer();
-      subTaskStatuseventConsumer.subscribe();
-      subscribeSubTaskStatusEvent(ORACLE_SUBTASK_STATUS);
+  private void subscribeParallelEvents() throws Exception {
+    createSubTaskConsumer();
+    if (isLeader.get()) {
+      createSubTaskStatusConsumer();
     }
   }
 
-  private void subscribeSubTaskStatusEvent(String oracleSubtaskStatus) {
-
+  private void createSubTaskStatusConsumer() {
+    if (subTaskStatuseventConsumer == null) {
+      subTaskStatuseventConsumer = new EventConsumer("oracle_sub_task_status-" + UUID.randomUUID(),
+          Collections.singleton(subTaskStatusTopic));
+      subTaskStatuseventConsumer.createConsumer();
+      subTaskStatuseventConsumer.subscribe();
+      executorService.execute(() -> subscribeSubTaskStatusEvent());
+    } else {
+      subTaskStatuseventConsumer.start();
+    }
   }
 
-  private void subscribeSubTaskEvent(String oracleSubTasks) {
+  private void createSubTaskConsumer() {
+    if (subTaskConsumer == null) {
+      subTaskConsumer = new EventConsumer("oracle_sub_task",
+          Collections.singleton(subTaskTopic));
+      subTaskConsumer.createConsumer();
+      subTaskConsumer.subscribe();
+      executorService.execute(() -> subscribeSubTaskEvent());
+    } else {
+      subTaskConsumer.start();
+    }
+  }
+
+  private void subscribeSubTaskStatusEvent() {
 
     Throwable ex = null;
-
     try {
-      ConsumerRecords<String, String> events = subTaskConsumer.poll();
-      if (events != null && events.count() > 0) {
-        for (TopicPartition partition : events.partitions()) {
-          List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
-          if (partitionRecords.size() == 0) {
-            continue;
-          }
-          if (logger.isInfoEnabled()) {
-            logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
-                partitionRecords.get(0).offset(),
-                partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
-          }
+      while (true) {
+        if (isLeader.get() && subTaskStatuseventConsumer.canRun()) {
+          ConsumerRecords<String, String> events = subTaskStatuseventConsumer.poll();
+          if (events != null && events.count() > 0) {
+            for (TopicPartition partition : events.partitions()) {
+              List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
+              if (partitionRecords.size() == 0) {
+                continue;
+              }
+              if (logger.isInfoEnabled()) {
+                logger.info("Got {} subtask status events between {} & {} in {}", partitionRecords.size(),
+                    partitionRecords.get(0).offset(),
+                    partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
+              }
+              subtask_recv_count.addAndGet(partitionRecords.size());
+              logger.info("Total subtask -{}, recv count -{}", totalSubtask, subtask_recv_count.get());
+              if (totalSubtask == subtask_recv_count.get()) {
+                //send Task End Response
+                //send EndMessage to each of the partitions in Data Topic
 
-          for (ConsumerRecord<String, String> record : partitionRecords) {
-            String eventSting = record.value();
-            if (eventSting == null) {
-              continue;
+                sendTaskEndResponse();
+                sendEndMessage();
+                subTaskStatuseventConsumer.close();
+                totalSubtask = 0;
+                subtask_recv_count.set(0);
+                isLeader.compareAndSet(true, false);
+              }
+              ex = commitAndHandleErrors(subTaskStatuseventConsumer, partition, partitionRecords);
             }
-            OracleEvent<OracleSettings> eventObj = getEvent(eventSting);
-            List<Data> data = queryData(eventObj);
-            post(data);
-          }
-
-          try {
-
-            if (partitionRecords.size() > 0) {
-              long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-              subTaskConsumer.commitSync(
-                  Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
-            }
-          } catch (WakeupException | InterruptException e) {
-            throw e;
-          } catch (Throwable e) {
-            logger.catching(e);
-            if (ex == null) {
-              ex = e;
-            }
-            try {
-              logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
-                  partitionRecords.get(0).offset(),
-                  partitionRecords.get(partitionRecords.size() - 1).offset(),
-                  partition.toString());
-
-              subTaskConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
-            } catch (Throwable e1) {
-              subTaskConsumer.restartBeforeNextPoll();
+            if (ex != null) {
+              throw ex;
             }
           }
         }
-        if (ex != null) {
-          throw ex;
-        }
+        // subTaskConsumer.close();
       }
+    } catch (WakeupException | InterruptException e) {
+      // logger.warn("{} wokeup/interrupted...", getName());
     } catch (Throwable e) {
       logger.catching(e);
     }
-    logger.debug("Stopped event consumer for {} task " + taskCode);
+    logger.debug("Stopped subtask status consumer for {} task " + taskCode);
 
   }
 
-  @Override
-  public void handleData(Event<OracleSettings> event) {
-    isLeader = true;
-    OracleSettings s = event.getSettings();
-    createSubTasks(s);
-    subscribeParallelEvents();
+  private void subscribeSubTaskEvent() {
+    Throwable ex = null;
+    try {
+      while (true) {
+        if (subTaskConsumer.canRun()) {
+          ConsumerRecords<String, String> events = subTaskConsumer.poll();
+          if (events != null && events.count() > 0) {
+            for (TopicPartition partition : events.partitions()) {
+              List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
+              if (partitionRecords.size() == 0) {
+                continue;
+              }
+              if (logger.isInfoEnabled()) {
+                logger.info("Got {} sub task events between {} & {} in {}", partitionRecords.size(),
+                    partitionRecords.get(0).offset(),
+                    partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
+              }
 
+              for (ConsumerRecord<String, String> record : partitionRecords) {
+                String eventSting = record.value();
+                if (eventSting == null) {
+                  continue;
+                }
+                OracleTaskRequest<OracleSettings> eventObj = getTaskRequest(eventSting);
+                List<Data> data = queryData(eventObj);
+                post(data);
+                postStatusEvent(eventObj);
+              }
+
+              ex = commitAndHandleErrors(subTaskConsumer, partition, partitionRecords);
+            }
+            if (ex != null) {
+              throw ex;
+            }
+          }
+        }
+        // subTaskConsumer.close();
+      }
+    } catch (WakeupException | InterruptException e) {
+      // logger.warn("{} wokeup/interrupted...", getName());
+    } catch (Throwable e) {
+      logger.catching(e);
+    }
+    logger.debug("Stopped subtask consumer for {} task " + taskCode);
+
+  }
+
+  private void postStatusEvent(OracleTaskRequest<OracleSettings> eventObj) throws Exception {
+    try (Producer producer = Producer.get()) {
+      producer.beginTransaction();
+      producer.send(subTaskStatusTopic, eventObj);
+      producer.commitTransaction();
+    }
+  }
+
+  @Override
+  public void handleData(TaskRequest<OracleSettings> event) throws Exception {
+    OracleSettings s = event.getSettings();
+    String taskId = UUID.randomUUID().toString();
+    if (subTaskConsumer == null) {
+      subTaskTopic = ORACLE_SUB_TASKS + "_" + taskId;
+      createTopic(subTaskTopic, bootStrapServer, partitions);
+    }
+    if (isLeader.get()) {
+      if (subTaskStatuseventConsumer == null) {
+        subTaskStatusTopic = ORACLE_SUBTASK_STATUS + "_" + taskId;
+        createTopic(subTaskStatusTopic, bootStrapServer, partitions);
+      }
+    }
+    createSubTasks(s);
+    sendTaskStartResponse();
+    subscribeParallelEvents();
   }
 
   private void createSubTasks(OracleSettings settings) {
     try {
       String tableName = settings.getTableName();
-      int fetchSize = settings.getFetchSize();
-      String cntSql = getCountSql(tableName);
-      try (Connection con = getConnection(settings)) {
-        Statement stmt = con.createStatement();
-        stmt.closeOnCompletion();
-        try (ResultSet rs = stmt.executeQuery(cntSql)) {
-          int rowCount = rs.getInt("ROW_COUNT");
-          int subTasks = getTasks(rowCount, fetchSize);
-          createSubTaskEvents(subTasks, settings);
-        }
-
-      }
+      Integer partitionSize = settings.getPartitionSize();
+      Integer rowCount = getCountSql(settings, tableName);
+      Integer subTasks = getTasks(rowCount, partitionSize);
+      this.totalSubtask = subTasks;
+      produceSubTaskMessages(subTasks, settings, subTaskTopic);
     } catch (Exception e) {
       logger.error("Error while creating sub tasks - ", e.getMessage());
       throw new CloudIOException(e);
     }
   }
 
-  private void createSubTaskEvents(int subTasks, OracleSettings settings) throws Exception {
-    Producer producer = Producer.get();
-    producer.beginTransaction();
-    for (int i = 1; i <= subTasks; i++) {
-      OracleEvent<OracleSettings> event = getDBEvent(subTasks, i);
-      producer.send(ORACLE_SUB_TASKS, event);
+  private void produceSubTaskMessages(int subTasks, OracleSettings settings, String topic) throws Exception {
+    try (Producer producer = Producer.get()) {
+      producer.beginTransaction();
+      for (int i = 1; i <= subTasks; i++) {
+        OracleTaskRequest<OracleSettings> event = getDBEvent(subTasks, i);
+        event.setSettings(settings);
+        producer.send(topic, event);
+      }
+      producer.commitTransaction();
     }
-    producer.commitTransaction();
-
   }
 
-  private OracleEvent<OracleSettings> getDBEvent(int subTasks, int i) {
-    OracleEvent<OracleSettings> e = new OracleEvent<OracleSettings>();
-    e.setPageNo(1);
+  private OracleTaskRequest<OracleSettings> getDBEvent(int subTasks, int i) {
+    OracleTaskRequest<OracleSettings> e = new OracleTaskRequest<OracleSettings>();
+    e.setPageNo(i);
+    e.setOffset((i - 1) * taskRequest.getSettings().getPartitionSize());
+    e.setLimit(i * taskRequest.getSettings().getPartitionSize());
     e.setTotalPages(subTasks);
-    e.setFromTopic(event.getToTopic());
-    e.setSettings(event.getSettings());
-    e.setWfUid(event.getWfUid());
+    e.setFromTopic(taskRequest.getToTopic());
+    e.setSettings(taskRequest.getSettings());
+    e.setWfUid(taskRequest.getWfUid());
     return e;
   }
 
-  private int getTasks(int toatl, int fetchSize) {
+  private int getTasks(Integer toatl, Integer fetchSize) {
     if (toatl % fetchSize == 0) {
       return (toatl / fetchSize);
     } else {
@@ -193,22 +273,28 @@ public abstract class OracleInputTask extends InputTask<Event<OracleSettings>, D
     }
   }
 
-  private Connection getConnection(OracleSettings settings) throws Exception {
-    Properties info = new Properties();
-    info.put(OracleConnection.CONNECTION_PROPERTY_USER_NAME, settings.getUserName());
-    info.put(OracleConnection.CONNECTION_PROPERTY_PASSWORD, settings.getPassword());
-    info.put(OracleConnection.CONNECTION_PROPERTY_DEFAULT_ROW_PREFETCH, "20");
-
-    OracleDataSource ods = new OracleDataSource();
-    ods.setURL(settings.getJdbcUrl());
-    ods.setConnectionProperties(info);
-    return ods.getConnection();
-
+  @Override
+  protected OracleTaskRequest getTaskRequest(String eventJson) {
+    return GsonUtil.getDBSettingsEvent(eventJson);
   }
 
-  @Override
-  protected OracleEvent<OracleSettings> getEvent(String eventJson) {
-    return GsonUtil.getDBSettingsEvent(eventJson);
+  protected List<HashMap<String, Object>> getSchema(String tableName) throws Exception {
+    if (schemaCache.get(tableName) != null) {
+      return schemaCache.get(tableName);
+    }
+    return schemas.getSchema(tableName);
+  }
+
+  protected Data populateData(ResultSet rs) throws Exception {
+    Data d = new Data();
+    List<HashMap<String, Object>> schema = getSchema(taskRequest.getSettings().getTableName());
+    for (int i = 0; i < schema.size(); i++) {
+      Map<String, Object> field = schema.get(i);
+      String fieldName = (String) field.get("fieldName");
+      Object obj = rs.getObject(fieldName);
+      d.put(fieldName, obj);
+    }
+    return d;
   }
 
 }

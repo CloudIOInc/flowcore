@@ -1,9 +1,7 @@
 
 package io.cloudio.messages;
 
-import io.cloudio.task.Event;
-
-public class OracleEvent<DBSettings> extends Event<Settings> {
+public class OracleTaskRequest<OracleSettings> extends TaskRequest<Settings> {
   private int totalPages;
   private int pageNo;
   private int limit;

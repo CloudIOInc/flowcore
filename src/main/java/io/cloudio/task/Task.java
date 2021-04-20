@@ -17,10 +17,11 @@ import org.apache.logging.log4j.Logger;
 import io.cloudio.consumer.Consumer;
 import io.cloudio.consumer.EventConsumer;
 import io.cloudio.messages.Settings;
+import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.GsonUtil;
 
-public abstract class Task<E extends Event<?>, D extends Data, O extends Data> {
+public abstract class Task<E extends TaskRequest<?>, D extends Data, O extends Data> {
   protected E event;
   private String taskCode;
   protected String eventTopic;
@@ -39,11 +40,11 @@ public abstract class Task<E extends Event<?>, D extends Data, O extends Data> {
     this.groupId = taskCode + "-grId";
   }
 
-  void onStart(Event<?> event) {
+  void onStart(TaskRequest<?> event) {
 
   }
 
-  void onEnd(Event<?> event) {
+  void onEnd(TaskRequest<?> event) {
 
   }
 
@@ -84,7 +85,7 @@ public abstract class Task<E extends Event<?>, D extends Data, O extends Data> {
             if (eventSting == null) {
               continue;
             }
-            Event<Settings> eventObj = GsonUtil.getEventObject(eventSting);
+            TaskRequest<Settings> eventObj = GsonUtil.getEventObject(eventSting);
             handleEvent(eventObj);
           }
 
@@ -124,10 +125,10 @@ public abstract class Task<E extends Event<?>, D extends Data, O extends Data> {
     logger.debug("Stopped event consumer for {} task " + taskCode);
   }
 
-  private void handleEvent(Event<Settings> event) { // new event from wf engine
+  private void handleEvent(TaskRequest<Settings> event) { // new event from wf engine
     unsubscribeEvent();
     this.event = (E) event;
-    subscribeData(event.fromTopic);
+    subscribeData(event.getFromTopic());
   }
 
   protected void post(List<O> data) {
@@ -135,7 +136,7 @@ public abstract class Task<E extends Event<?>, D extends Data, O extends Data> {
       // TODO: Check what if data size is large
       producer.beginTransaction();
       for (Data obj : data) {
-        producer.send(event.toTopic, obj);
+        producer.send(event.getToTopic(), obj);
       }
       producer.commitTransaction();
     } catch (Exception e) {

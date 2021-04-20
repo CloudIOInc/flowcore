@@ -1,6 +1,8 @@
 
 package io.cloudio.messages;
 
+import java.util.Date;
+
 public class OracleSettings extends Settings {
 
   private String jdbcUrl;
@@ -9,9 +11,12 @@ public class OracleSettings extends Settings {
 
   private String tableName;
   private String lastUpdateColumn;
+  private Date lud;
   private String idColumn;
+  private Double idVal;
 
-  private int fetchSize;
+  private Integer fetchSize;
+  private Integer partitionSize;
 
   public String getJdbcUrl() {
     return jdbcUrl;
@@ -61,11 +66,31 @@ public class OracleSettings extends Settings {
     this.idColumn = idColumn;
   }
 
-  public int getFetchSize() {
-    return fetchSize;
+  public Date getLastUpdateDate() {
+    return lud;
   }
 
-  public void setFetchSize(int fetchSize) {
+  public void setLastUpdateDate(Date lud) {
+    this.lud = lud;
+  }
+
+  public Double getIdVal() {
+    return idVal;
+  }
+
+  public void setIdVal(Double idVal) {
+    this.idVal = idVal;
+  }
+
+  public Integer getPartitionSize() {
+    return partitionSize;
+  }
+
+  public void setPartitionSize(Integer partitionSize) {
+    this.partitionSize = partitionSize;
+  }
+
+  public void setFetchSize(Integer fetchSize) {
     this.fetchSize = fetchSize;
   }
 

@@ -1,13 +1,12 @@
 
 package io.cloudio.messages;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-public class TaskEndReponse {
+public class TaskEndResponse {
   private int executionId;
-  private Date endDate;
+  private String endDate;
   private Map<String, String> outCome;
   private Map<String, Object> outPut;
   private String nodeUid;
@@ -91,11 +90,11 @@ public class TaskEndReponse {
     this.wfUid = wfUid;
   }
 
-  public Date getEndDate() {
+  public String getEndDate() {
     return endDate;
   }
 
-  public void setEndDate(Date endDate) {
+  public void setEndDate(String endDate) {
     this.endDate = endDate;
   }
 

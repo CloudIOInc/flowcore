@@ -12,10 +12,13 @@ public class Data extends TreeMap<String, Object> {
   EventType _eventType;
 
   public boolean isEnd() {
-    //return this._eventType == EventType.End;
-	if(this.containsKey("_eventType")){
-		return ((String)this.get("_eventType")).equalsIgnoreCase("End");
-	}
+    if (this.containsKey("_eventType")) {
+      return ((String) this.get("_eventType")).equalsIgnoreCase("End");
+    }
     return false;
+  }
+
+  public void setEnd(EventType type) {
+    put("_eventType", type.name());
   }
 }
