@@ -12,11 +12,11 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import io.cloudio.task.Data;
 import io.cloudio.util.JsonDeserializer;
 
-public class Consumer extends BaseConsumer<String, Data> {
+public class DataConsumer extends BaseConsumer<String, Data> {
 
   // private static Logger logger = LogManager.getLogger(Consumer.class);
 
-  public Consumer(String groupId, Collection<String> topicNames) {
+  public DataConsumer(String groupId, Collection<String> topicNames) {
     super(groupId, topicNames);
     // TODO Auto-generated constructor stub
   }

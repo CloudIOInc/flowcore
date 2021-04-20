@@ -14,8 +14,8 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import io.cloudio.consumer.Consumer;
-import io.cloudio.consumer.EventConsumer;
+import io.cloudio.consumer.DataConsumer;
+import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.messages.Settings;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
@@ -28,8 +28,8 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
   private String taskCode;
   private String eventTopic;
 
-  private Consumer dataConsumer;
-  private EventConsumer taskConsumer;
+  private DataConsumer dataConsumer;
+  private TaskConsumer taskConsumer;
   private String eventConsumerGroupId;
   private String dataConsumerGroupId;
 
@@ -56,7 +56,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
   public void start(String bootStrapServer, int partitions) throws Exception {
     logger.info("TransformTask : start");
     createTopic(eventTopic, bootStrapServer, partitions);
-    taskConsumer = new EventConsumer(eventConsumerGroupId, Collections.singleton(eventTopic));
+    taskConsumer = new TaskConsumer(eventConsumerGroupId, Collections.singleton(eventTopic));
     taskConsumer.createConsumer(); // TODO : Revisit
     taskConsumer.subscribe();// TODO: Revisit
     subscribeEvent(eventTopic); // listen to workflow engine for instructions
@@ -164,7 +164,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
     Throwable ex = null;
     // TODO : handle while -> true
     if (dataConsumer == null) {
-      dataConsumer = new Consumer(dataConsumerGroupId, Collections.singleton(fromTopic));
+      dataConsumer = new DataConsumer(dataConsumerGroupId, Collections.singleton(fromTopic));
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
     }

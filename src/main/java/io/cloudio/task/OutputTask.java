@@ -14,8 +14,8 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import io.cloudio.consumer.Consumer;
-import io.cloudio.consumer.EventConsumer;
+import io.cloudio.consumer.DataConsumer;
+import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.messages.Settings;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
@@ -27,8 +27,8 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
   protected String eventTopic;
 
   // TODO: FIXME : EventConsumer and Consumer should run in thread ??
-  private Consumer dataConsumer;
-  private EventConsumer eventConsumer;
+  private DataConsumer dataConsumer;
+  private TaskConsumer eventConsumer;
   private Producer producer;
   protected String groupId;
 
@@ -54,7 +54,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
 
     producer = Producer.get();
 
-    eventConsumer = new EventConsumer(groupId, Collections.singleton(eventTopic));
+    eventConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
     eventConsumer.createConsumer(); // TODO : Revisit
     eventConsumer.subscribe();// TODO: Revisit
     subscribeEvent(eventTopic); // listen to workflow engine for instructions
@@ -154,7 +154,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
     Throwable ex = null;
     // TODO : handle while -> true
     if (dataConsumer == null) {
-      dataConsumer = new Consumer(groupId + "n3", Collections.singleton(fromTopic));
+      dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(fromTopic));
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
     }

@@ -21,7 +21,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import io.cloudio.consumer.EventConsumer;
+import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.exceptions.CloudIOException;
 import io.cloudio.messages.OracleSettings;
 import io.cloudio.messages.OracleTaskRequest;
@@ -35,19 +35,22 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
   private static Logger logger = LogManager.getLogger(OracleInputTask.class);
   private static final String ORACLE_SUBTASK_STATUS = "oracle_subtask_status";
   private static final String ORACLE_SUB_TASKS = "oracle_sub_tasks";
-  private EventConsumer subTaskConsumer;
-  private EventConsumer subTaskStatuseventConsumer;
+  private TaskConsumer subTaskConsumer;
+  private TaskConsumer subTaskStatuseventConsumer;
   private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
   static ExecutorService executorService = Executors.newFixedThreadPool(8);
-  private String subTaskTopic;
-  private String subTaskStatusTopic;
   private Integer totalSubtask;
   private AtomicInteger subtask_recv_count = new AtomicInteger(0);
   SchemaReader schemas = new SchemaReader();
 
-  protected OracleInputTask(String taskCode) {
-    super(taskCode);
+  public void createTopics() throws Exception {
+    createTopic(ORACLE_SUB_TASKS, bootStrapServer, partitions);
+    createTopic(ORACLE_SUBTASK_STATUS, bootStrapServer, partitions);
 
+  }
+
+  protected OracleInputTask(String taskCode) throws Exception {
+    super(taskCode);
   }
 
   public abstract Integer getCountSql(OracleSettings settings, String tableName) throws Exception;
@@ -73,17 +76,10 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
     });
   }
 
-  private void subscribeParallelEvents() throws Exception {
-    createSubTaskConsumer();
-    if (isLeader.get()) {
-      createSubTaskStatusConsumer();
-    }
-  }
-
   private void createSubTaskStatusConsumer() {
     if (subTaskStatuseventConsumer == null) {
-      subTaskStatuseventConsumer = new EventConsumer("oracle_sub_task_status-" + UUID.randomUUID(),
-          Collections.singleton(subTaskStatusTopic));
+      subTaskStatuseventConsumer = new TaskConsumer("oracle_sub_task_status-" + UUID.randomUUID(),
+          Collections.singleton(ORACLE_SUBTASK_STATUS));
       subTaskStatuseventConsumer.createConsumer();
       subTaskStatuseventConsumer.subscribe();
       executorService.execute(() -> subscribeSubTaskStatusEvent());
@@ -92,10 +88,10 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
     }
   }
 
-  private void createSubTaskConsumer() {
+  public void createSubTaskConsumer() throws Exception {
     if (subTaskConsumer == null) {
-      subTaskConsumer = new EventConsumer("oracle_sub_task",
-          Collections.singleton(subTaskTopic));
+      subTaskConsumer = new TaskConsumer("oracle_sub_task",
+          Collections.singleton(ORACLE_SUB_TASKS));
       subTaskConsumer.createConsumer();
       subTaskConsumer.subscribe();
       executorService.execute(() -> subscribeSubTaskEvent());
@@ -178,7 +174,7 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
                 }
                 OracleTaskRequest<OracleSettings> eventObj = getTaskRequest(eventSting);
                 List<Data> data = queryData(eventObj);
-                post(data);
+                post(data, eventObj);
                 postStatusEvent(eventObj);
               }
 
@@ -203,7 +199,7 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
   private void postStatusEvent(OracleTaskRequest<OracleSettings> eventObj) throws Exception {
     try (Producer producer = Producer.get()) {
       producer.beginTransaction();
-      producer.send(subTaskStatusTopic, eventObj);
+      producer.send(ORACLE_SUBTASK_STATUS, eventObj);
       producer.commitTransaction();
     }
   }
@@ -211,20 +207,11 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
   @Override
   public void handleData(TaskRequest<OracleSettings> event) throws Exception {
     OracleSettings s = event.getSettings();
-    String taskId = UUID.randomUUID().toString();
-    if (subTaskConsumer == null) {
-      subTaskTopic = ORACLE_SUB_TASKS + "_" + taskId;
-      createTopic(subTaskTopic, bootStrapServer, partitions);
-    }
-    if (isLeader.get()) {
-      if (subTaskStatuseventConsumer == null) {
-        subTaskStatusTopic = ORACLE_SUBTASK_STATUS + "_" + taskId;
-        createTopic(subTaskStatusTopic, bootStrapServer, partitions);
-      }
-    }
     createSubTasks(s);
     sendTaskStartResponse(taskRequest, groupId);
-    subscribeParallelEvents();
+    if (isLeader.get()) {
+      createSubTaskStatusConsumer();
+    }
   }
 
   private void createSubTasks(OracleSettings settings) {
@@ -234,7 +221,7 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
       Integer rowCount = getCountSql(settings, tableName);
       Integer subTasks = getTasks(rowCount, partitionSize);
       this.totalSubtask = subTasks;
-      produceSubTaskMessages(subTasks, settings, subTaskTopic);
+      produceSubTaskMessages(subTasks, settings, ORACLE_SUB_TASKS);
     } catch (Exception e) {
       logger.error("Error while creating sub tasks - ", e.getMessage());
       throw new CloudIOException(e);
@@ -245,7 +232,7 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
     try (Producer producer = Producer.get()) {
       producer.beginTransaction();
       for (int i = 1; i <= subTasks; i++) {
-        OracleTaskRequest<OracleSettings> event = getDBEvent(subTasks, i);
+        OracleTaskRequest<OracleSettings> event = getTaskRequest(subTasks, i);
         event.setSettings(settings);
         producer.send(topic, event);
       }
@@ -253,13 +240,13 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
     }
   }
 
-  private OracleTaskRequest<OracleSettings> getDBEvent(int subTasks, int i) {
+  private OracleTaskRequest<OracleSettings> getTaskRequest(int subTasks, int i) {
     OracleTaskRequest<OracleSettings> e = new OracleTaskRequest<OracleSettings>();
     e.setPageNo(i);
     e.setOffset((i - 1) * taskRequest.getSettings().getPartitionSize());
     e.setLimit(i * taskRequest.getSettings().getPartitionSize());
     e.setTotalPages(subTasks);
-    e.setFromTopic(taskRequest.getToTopic());
+    e.setToTopic(taskRequest.getToTopic());
     e.setSettings(taskRequest.getSettings());
     e.setWfUid(taskRequest.getWfUid());
     return e;
@@ -285,9 +272,9 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
     return schemas.getSchema(tableName);
   }
 
-  protected Data populateData(ResultSet rs) throws Exception {
+  protected Data populateData(ResultSet rs, OracleSettings settings) throws Exception {
     Data d = new Data();
-    List<HashMap<String, Object>> schema = getSchema(taskRequest.getSettings().getTableName());
+    List<HashMap<String, Object>> schema = getSchema(settings.getTableName());
     for (int i = 0; i < schema.size(); i++) {
       Map<String, Object> field = schema.get(i);
       String fieldName = (String) field.get("fieldName");

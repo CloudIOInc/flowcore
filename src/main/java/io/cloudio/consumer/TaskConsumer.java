@@ -8,9 +8,9 @@ import java.util.Properties;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
-public class EventConsumer extends BaseConsumer<String, String> {
+public class TaskConsumer extends BaseConsumer<String, String> {
 
-  public EventConsumer(String groupId, Collection<String> topicNames) {
+  public TaskConsumer(String groupId, Collection<String> topicNames) {
     super(groupId, topicNames);
   }
 
@@ -22,7 +22,7 @@ public class EventConsumer extends BaseConsumer<String, String> {
 
   @Override
   public String getName() {
-    return null;
+    return topicNames.toString();
   }
 
   //CHANGED : Return type changed to ConsumerRecords so that task will commit if 

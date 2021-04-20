@@ -17,7 +17,7 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import io.cloudio.consumer.EventConsumer;
+import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.exceptions.CloudIOException;
 import io.cloudio.messages.Settings;
 import io.cloudio.messages.TaskRequest;
@@ -30,7 +30,7 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
   protected String taskCode;
   protected String eventTopic;
 
-  protected EventConsumer taskConsumer;
+  protected TaskConsumer taskConsumer;
   protected String groupId;
 
   protected String bootStrapServer;
@@ -56,15 +56,22 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
 
   public abstract void handleData(T event) throws Exception;
 
+  protected void createSubTaskConsumer() throws Exception {
+  }
+
+  protected void createTopics() throws Exception {
+  }
+
   public void start(String bootStrapServer, int partitions) throws Exception {
     createTopic(eventTopic, bootStrapServer, partitions);
     this.bootStrapServer = bootStrapServer;
     this.partitions = partitions;
-
-    taskConsumer = new EventConsumer(groupId, Collections.singleton(eventTopic));
+    taskConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
     taskConsumer.getProperties().put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
     taskConsumer.createConsumer();
     taskConsumer.subscribe();
+    createTopics();
+    createSubTaskConsumer();
     subscribeEvent(eventTopic);
   }
 
@@ -116,7 +123,7 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
     logger.debug("Stopped event consumer for {} task ", taskCode);
   }
 
-  protected Throwable commitAndHandleErrors(EventConsumer consumer, TopicPartition partition,
+  protected Throwable commitAndHandleErrors(TaskConsumer consumer, TopicPartition partition,
       List<ConsumerRecord<String, String>> partitionRecords) {
     Throwable ex = null;
     try {
@@ -158,7 +165,7 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
     startEvent();
   }
 
-  protected void post(List<O> data) {
+  protected void post(List<O> data, TaskRequest<Settings> taskRequest) {
     try {
       try (Producer producer = Producer.get()) {
         producer.beginTransaction();
