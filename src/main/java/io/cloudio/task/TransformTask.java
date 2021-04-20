@@ -22,16 +22,14 @@ import io.cloudio.producer.Producer;
 import io.cloudio.util.GsonUtil;
 import io.cloudio.util.KafkaUtil;
 
-public abstract class TransformTask<R extends TaskRequest<?>> {
+public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
 
   public R taskRequest;
   private String taskCode;
   private String eventTopic;
 
-  // TODO: FIXME : EventConsumer and Consumer should run in thread ??
   private Consumer dataConsumer;
-  private EventConsumer eventConsumer;
-  private Producer producer;
+  private EventConsumer taskConsumer;
   private String eventConsumerGroupId;
   private String dataConsumerGroupId;
 
@@ -57,11 +55,10 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
 
   public void start(String bootStrapServer, int partitions) throws Exception {
     logger.info("TransformTask : start");
-    producer = Producer.get();
     createTopic(eventTopic, bootStrapServer, partitions);
-    eventConsumer = new EventConsumer(eventConsumerGroupId, Collections.singleton(eventTopic));
-    eventConsumer.createConsumer(); // TODO : Revisit
-    eventConsumer.subscribe();// TODO: Revisit
+    taskConsumer = new EventConsumer(eventConsumerGroupId, Collections.singleton(eventTopic));
+    taskConsumer.createConsumer(); // TODO : Revisit
+    taskConsumer.subscribe();// TODO: Revisit
     subscribeEvent(eventTopic); // listen to workflow engine for instructions
     // subscribeData(); //TODO: events and data consumers run in parallel
   }
@@ -70,9 +67,9 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
     Throwable ex = null;
 
     try {
-      while (eventConsumer.canRun()) {
+      while (taskConsumer.canRun()) {
         logger.info("eventConsumer poll() calling");
-        ConsumerRecords<String, String> events = eventConsumer.poll();
+        ConsumerRecords<String, String> events = taskConsumer.poll();
         // if there is no event we should trigger subscribeEvent in loop
         // TODO : Can below code go in consumer ??
         if (events != null && events.count() > 0) {
@@ -101,7 +98,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
 
               if (partitionRecords.size() > 0) {
                 long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-                eventConsumer.commitSync(
+                taskConsumer.commitSync(
                     Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
               }
             } catch (WakeupException | InterruptException e) {
@@ -116,9 +113,9 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
                     partitionRecords.get(0).offset(),
                     partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
 
-                eventConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
+                taskConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
               } catch (Throwable e1) {
-                eventConsumer.restartBeforeNextPoll();
+                taskConsumer.restartBeforeNextPoll();
               }
             }
           }
@@ -134,12 +131,13 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
     logger.debug("Stopped event consumer for {} task " + taskCode);
   }
 
-  private void handleEvent(TaskRequest<Settings> request) { // new event from wf engine
+  private void handleEvent(TaskRequest<Settings> request) throws Exception { // new event from wf engine
     //unsubscribeEvent();
     this.taskRequest = (R) request;
     if (dataConsumer != null) {
       dataConsumer.start();
     }
+    sendTaskStartResponse(request, eventConsumerGroupId);
     subscribeData(taskRequest.getFromTopic());
   }
 
@@ -217,9 +215,9 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
                     partitionRecords.get(partitionRecords.size() - 1).offset(),
                     partition.toString());
 
-                eventConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
+                taskConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
               } catch (Throwable e1) {
-                eventConsumer.restartBeforeNextPoll();
+                taskConsumer.restartBeforeNextPoll();
               }
             }
           }
@@ -246,7 +244,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> {
   }
 
   private void unsubscribeEvent() {
-    eventConsumer.close();
+    taskConsumer.close();
   }
 
   protected void createTopic(String eventTopic, String bootStrapServer, int partitions) throws Exception {

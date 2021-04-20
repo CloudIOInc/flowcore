@@ -2,8 +2,6 @@
 package io.cloudio.task;
 
 import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -22,25 +20,21 @@ import org.apache.logging.log4j.Logger;
 import io.cloudio.consumer.EventConsumer;
 import io.cloudio.exceptions.CloudIOException;
 import io.cloudio.messages.Settings;
-import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
-import io.cloudio.messages.TaskStartResponse;
 import io.cloudio.producer.Producer;
 import io.cloudio.task.Data.EventType;
-import io.cloudio.util.JsonUtils;
 import io.cloudio.util.KafkaUtil;
 
-public abstract class InputTask<T extends TaskRequest<? extends Settings>, O extends Data> {
+public abstract class InputTask<T extends TaskRequest<? extends Settings>, O extends Data> extends BaseTask {
   protected T taskRequest;
   protected String taskCode;
   protected String eventTopic;
 
-  protected EventConsumer eventConsumer;
+  protected EventConsumer taskConsumer;
   protected String groupId;
 
   protected String bootStrapServer;
   protected int partitions;
-  public static final String WF_EVENTS_TOPIC = "WF_EVENTS";
 
   protected AtomicBoolean isLeader = new AtomicBoolean(false);
 
@@ -67,10 +61,10 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
     this.bootStrapServer = bootStrapServer;
     this.partitions = partitions;
 
-    eventConsumer = new EventConsumer(groupId, Collections.singleton(eventTopic));
-    eventConsumer.getProperties().put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
-    eventConsumer.createConsumer();
-    eventConsumer.subscribe();
+    taskConsumer = new EventConsumer(groupId, Collections.singleton(eventTopic));
+    taskConsumer.getProperties().put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
+    taskConsumer.createConsumer();
+    taskConsumer.subscribe();
     subscribeEvent(eventTopic);
   }
 
@@ -83,8 +77,8 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
 
     try {
       while (true) {
-        if (eventConsumer.canRun()) {
-          ConsumerRecords<String, String> events = eventConsumer.poll();
+        if (taskConsumer.canRun()) {
+          ConsumerRecords<String, String> events = taskConsumer.poll();
           // TODO : Can below code go in consumer ??
           if (events != null && events.count() > 0) {
             for (TopicPartition partition : events.partitions()) {
@@ -108,7 +102,7 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
                 handleEvent((T) taskRequest);
               }
               // isLeader.compareAndSet(true, false);
-              ex = commitAndHandleErrors(eventConsumer, partition, partitionRecords);
+              ex = commitAndHandleErrors(taskConsumer, partition, partitionRecords);
             }
             if (ex != null) {
               throw ex;
@@ -180,51 +174,13 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
   }
 
   protected void startEvent() {
-    eventConsumer.wakeup();
-    eventConsumer.start();
+    taskConsumer.wakeup();
+    taskConsumer.start();
     // subscribeEvent(eventTopic);
   }
 
   private void unsubscribeEvent() {
-    eventConsumer.close();
-  }
-
-  protected void sendTaskEndResponse() throws Exception {
-    TaskEndResponse response = new TaskEndResponse();
-    response.setExecutionId(taskRequest.getExecutionId());
-    response.setNodeUid(taskRequest.getNodeUid());
-    response.setWfInstUid(taskRequest.getWfInstUid());
-    response.setWfUid(taskRequest.getWfUid());
-    response.setTaskType(taskRequest.getTaskType());
-    response.setStartDate(taskRequest.getStartDate());
-    Map<String, String> outCome = new HashMap<String, String>();
-    outCome.put("status", "Success");
-    response.setOutCome(outCome);
-    response.setEndDate(JsonUtils.dateToJsonString(new Date()));
-    try (Producer p = Producer.get()) {
-      p.beginTransaction();
-      p.send(WF_EVENTS_TOPIC, response);
-      p.commitTransaction();
-    }
-    logger.info("Sending task end response  - {}", response);
-  }
-
-  protected void sendTaskStartResponse() throws Exception {
-    TaskStartResponse response = new TaskStartResponse();
-    response.setExecutionId(taskRequest.getExecutionId());
-    response.setNodeUid(taskRequest.getNodeUid());
-    response.setWfInstUid(taskRequest.getWfInstUid());
-    response.setWfUid(taskRequest.getWfUid());
-    response.setTaskType(taskRequest.getTaskType());
-    response.setStartDate(taskRequest.getStartDate());
-    List<Map<String, Integer>> offsets = KafkaUtil.getOffsets(taskRequest.getToTopic(), groupId, false);
-    response.setFromTopicStartOffsets(offsets);
-    try (Producer p = Producer.get()) {
-      p.beginTransaction();
-      p.send(WF_EVENTS_TOPIC, response);
-      p.commitTransaction();
-    }
-    logger.info("Sending task start response  - {}", response);
+    taskConsumer.close();
   }
 
   protected void sendEndMessage() throws Exception {

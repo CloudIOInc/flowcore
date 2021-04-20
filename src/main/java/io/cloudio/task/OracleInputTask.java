@@ -63,9 +63,9 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
           executorService.shutdown();
           executorService.awaitTermination(1, TimeUnit.MINUTES);
           Thread.sleep(1 * 60 * 1000);
-          Util.closeQuietly(subTaskConsumer);
           Util.closeQuietly(subTaskStatuseventConsumer);
-          Util.closeQuietly(eventConsumer);
+          Util.closeQuietly(subTaskConsumer);
+          Util.closeQuietly(taskConsumer);
         } catch (Exception e) {
           //ignore
         }
@@ -128,7 +128,7 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
                 //send Task End Response
                 //send EndMessage to each of the partitions in Data Topic
 
-                sendTaskEndResponse();
+                sendTaskEndResponse(taskRequest);
                 sendEndMessage();
                 subTaskStatuseventConsumer.close();
                 totalSubtask = 0;
@@ -223,7 +223,7 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
       }
     }
     createSubTasks(s);
-    sendTaskStartResponse();
+    sendTaskStartResponse(taskRequest, groupId);
     subscribeParallelEvents();
   }
 
