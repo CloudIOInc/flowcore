@@ -21,6 +21,7 @@ public class TaskRequest<S extends Settings> {
   private String toTopic;
   private String wfInstUid;
   private String wfUid;
+  private String tableName;
 
   public int getExecutionId() {
     return executionId;
@@ -108,6 +109,14 @@ public class TaskRequest<S extends Settings> {
 
   public void setWfUid(String wfUid) {
     this.wfUid = wfUid;
+  }
+
+  public String getTableName() {
+    return tableName;
+  }
+
+  public void setTableName(String tableName) {
+    this.tableName = tableName;
   }
 
 }

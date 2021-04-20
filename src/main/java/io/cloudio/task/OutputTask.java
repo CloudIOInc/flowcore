@@ -26,7 +26,6 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
   private String taskCode;
   protected String eventTopic;
 
-  // TODO: FIXME : EventConsumer and Consumer should run in thread ??
   private DataConsumer dataConsumer;
   private TaskConsumer eventConsumer;
   private Producer producer;
@@ -36,7 +35,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
 
   OutputTask(String taskCode) {
     this.taskCode = taskCode;
-    this.eventTopic = taskCode + "-events";
+    this.eventTopic = taskCode;
     this.groupId = taskCode + "-grId";
   }
 
@@ -48,17 +47,14 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
 
   }
 
-  public abstract void handleData(List<Data> data);
+  public abstract void handleData(List<Data> data) throws Exception;
 
   public void start() {
-
     producer = Producer.get();
-
     eventConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
     eventConsumer.createConsumer(); // TODO : Revisit
     eventConsumer.subscribe();// TODO: Revisit
     subscribeEvent(eventTopic); // listen to workflow engine for instructions
-    //subscribeData(); //TODO: events and data consumers run in parallel
   }
 
   void subscribeEvent(String eventTopic) {
@@ -66,8 +62,6 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
 
     try {
       ConsumerRecords<String, String> events = eventConsumer.poll();
-      // if there is no event we should trigger subscribeEvent in loop
-      // TODO : Can below code go in consumer ??
       if (events != null && events.count() > 0) {
         for (TopicPartition partition : events.partitions()) {
           List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
@@ -89,31 +83,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
             handleEvent(eventObj);
           }
 
-          try {
-
-            if (partitionRecords.size() > 0) {
-              long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-              eventConsumer.commitSync(
-                  Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
-            }
-          } catch (WakeupException | InterruptException e) {
-            throw e;
-          } catch (Throwable e) {
-            logger.catching(e);
-            if (ex == null) {
-              ex = e;
-            }
-            try {
-              logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
-                  partitionRecords.get(0).offset(),
-                  partitionRecords.get(partitionRecords.size() - 1).offset(),
-                  partition.toString());
-
-              eventConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
-            } catch (Throwable e1) {
-              eventConsumer.restartBeforeNextPoll();
-            }
-          }
+          ex = commitAndHandleErrors(eventConsumer, partition, partitionRecords);
         }
         if (ex != null) {
           throw ex;
@@ -131,96 +101,95 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
     subscribeData(event.getFromTopic());
   }
 
-  protected void post(List<O> data) {
-    try {
-      // TODO: Check what if data size is large
-      producer.beginTransaction();
-      for (Data obj : data) {
-        producer.send(event.getToTopic(), obj);
-      }
-      producer.commitTransaction();
-    } catch (Exception e) {
-      e.printStackTrace();
+  protected void post(List<O> data) throws Exception {
+    // TODO: Check what if data size is large
+    producer.beginTransaction();
+    for (Data obj : data) {
+      producer.send(event.getToTopic(), obj);
     }
+    producer.commitTransaction();
   }
 
   protected void unsubscribeData() {
     dataConsumer.close();
     eventConsumer.start();
+    eventConsumer.wakeup();
     subscribeEvent(eventTopic);
   }
 
   private void subscribeData(String fromTopic) {
     Throwable ex = null;
-    // TODO : handle while -> true
     if (dataConsumer == null) {
       dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(fromTopic));
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
     }
-    while (dataConsumer.canRun()) {
-      try {
-        ConsumerRecords<String, Data> dataRecords = dataConsumer.poll();
-        // TODO : Can below code go in consumer ??
-        if (dataRecords.count() > 0) {
-          for (TopicPartition partition : dataRecords.partitions()) {
-            List<ConsumerRecord<String, Data>> partitionRecords = dataRecords.records(partition);
-            if (partitionRecords.size() == 0) {
-              continue;
-            }
-            if (logger.isInfoEnabled()) {
-              logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
-                  partitionRecords.get(0).offset(),
-                  partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
-            }
-
-            List<Data> list = new ArrayList<>(partitionRecords.size());
-            for (ConsumerRecord<String, Data> record : partitionRecords) {
-              Data data = record.value();
-              if (data == null) {
+    while (true) {
+      if (dataConsumer.canRun()) {
+        try {
+          ConsumerRecords<String, Data> dataRecords = dataConsumer.poll();
+          if (dataRecords.count() > 0) {
+            for (TopicPartition partition : dataRecords.partitions()) {
+              List<ConsumerRecord<String, Data>> partitionRecords = dataRecords.records(partition);
+              if (partitionRecords.size() == 0) {
                 continue;
               }
-              list.add(data);
-            }
-            try {
-
+              if (logger.isInfoEnabled()) {
+                logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
+                    partitionRecords.get(0).offset(),
+                    partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
+              }
+              List<Data> list = new ArrayList<>(partitionRecords.size());
+              for (ConsumerRecord<String, Data> record : partitionRecords) {
+                Data data = record.value();
+                if (data == null) {
+                  continue;
+                }
+                list.add(data);
+              }
               if (list.size() > 0) {
                 this.handleData(list);
               }
-
-              if (partitionRecords.size() > 0) {
-                long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-                eventConsumer.commitSync(
-                    Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
-              }
-            } catch (WakeupException | InterruptException e) {
-              throw e;
-            } catch (Throwable e) {
-              logger.catching(e);
-              if (ex == null) {
-                ex = e;
-              }
-              try {
-                logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
-                    partitionRecords.get(0).offset(),
-                    partitionRecords.get(partitionRecords.size() - 1).offset(),
-                    partition.toString());
-
-                eventConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
-              } catch (Throwable e1) {
-                eventConsumer.restartBeforeNextPoll();
-              }
+              ex = commitDataConsumer(ex, partition, partitionRecords, list);
+            }
+            if (ex != null) {
+              throw ex;
             }
           }
-          if (ex != null) {
-            throw ex;
-          }
+        } catch (Throwable e) {
+          logger.catching(e);
         }
-      } catch (Throwable e) {
-        logger.catching(e);
       }
     }
-    logger.debug("Stopped data consumer for {} task " + taskCode);
+  }
+
+  private Throwable commitDataConsumer(Throwable ex, TopicPartition partition,
+      List<ConsumerRecord<String, Data>> partitionRecords, List<Data> list) {
+    try {
+      if (partitionRecords.size() > 0) {
+        long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
+        dataConsumer.commitSync(
+            Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
+      }
+    } catch (WakeupException | InterruptException e) {
+      throw e;
+    } catch (Throwable e) {
+      logger.catching(e);
+      if (ex == null) {
+        ex = e;
+      }
+      try {
+        logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
+            partitionRecords.get(0).offset(),
+            partitionRecords.get(partitionRecords.size() - 1).offset(),
+            partition.toString());
+
+        dataConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
+      } catch (Throwable e1) {
+        dataConsumer.restartBeforeNextPoll();
+      }
+    }
+    return ex;
   }
 
   private void unsubscribeEvent() {

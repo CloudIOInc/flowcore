@@ -38,7 +38,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
   public TransformTask(String taskCode) {
 
     this.taskCode = taskCode;
-    this.eventTopic = taskCode + "-events";
+    this.eventTopic = taskCode;
     this.eventConsumerGroupId = taskCode + "-eventGrId";
     this.dataConsumerGroupId = taskCode + "-dataGrId";
   }

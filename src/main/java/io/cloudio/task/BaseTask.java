@@ -1,24 +1,36 @@
 
 package io.cloudio.task;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.InterruptException;
+import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.messages.TaskStartResponse;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.JsonUtils;
 import io.cloudio.util.KafkaUtil;
+import io.cloudio.util.ReaderUtil;
 
 public class BaseTask {
-  public static final String WF_EVENTS_TOPIC = "WF_EVENTS";
+  public static final String WF_EVENTS_TOPIC = "wf_events";
   private static Logger logger = LogManager.getLogger(BaseTask.class);
+  private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
+  ReaderUtil readerUtil = new ReaderUtil();
 
   protected void sendTaskEndResponse(TaskRequest taskRequest) throws Exception {
     TaskEndResponse response = new TaskEndResponse();
@@ -56,6 +68,50 @@ public class BaseTask {
       p.commitTransaction();
     }
     logger.info("Sending task start response  - {}", response);
+  }
+
+  protected Throwable commitAndHandleErrors(TaskConsumer consumer, TopicPartition partition,
+      List<ConsumerRecord<String, String>> partitionRecords) {
+    Throwable ex = null;
+    try {
+
+      if (partitionRecords.size() > 0) {
+        long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
+        consumer.commitSync(
+            Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
+        logger.info("commiting offset - {}, partition - {}", lastOffset, partition);
+      }
+    } catch (WakeupException | InterruptException e) {
+      //throw e;
+    } catch (Throwable e) {
+      logger.catching(e);
+      if (ex == null) {
+        ex = e;
+      }
+      try {
+        logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
+            partitionRecords.get(0).offset(),
+            partitionRecords.get(partitionRecords.size() - 1).offset(),
+            partition.toString());
+
+        consumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
+      } catch (Throwable e1) {
+        logger.error(e1);
+        consumer.restartBeforeNextPoll();
+      }
+    }
+    return ex;
+  }
+
+  protected List<HashMap<String, Object>> getSchema(String tableName) throws Exception {
+    if (schemaCache.get(tableName) != null) {
+      return schemaCache.get(tableName);
+    }
+    return readerUtil.getSchema(tableName);
+  }
+
+  protected Properties getDBProperties() throws Exception {
+    return readerUtil.getDBProperties();
   }
 
 }

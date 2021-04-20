@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -28,7 +27,6 @@ import io.cloudio.messages.OracleTaskRequest;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.GsonUtil;
-import io.cloudio.util.SchemaReader;
 import io.cloudio.util.Util;
 
 public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettings>, Data> {
@@ -37,11 +35,9 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
   private static final String ORACLE_SUB_TASKS = "oracle_sub_tasks";
   private TaskConsumer subTaskConsumer;
   private TaskConsumer subTaskStatuseventConsumer;
-  private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
   static ExecutorService executorService = Executors.newFixedThreadPool(8);
   private Integer totalSubtask;
   private AtomicInteger subtask_recv_count = new AtomicInteger(0);
-  SchemaReader schemas = new SchemaReader();
 
   public void createTopics() throws Exception {
     createTopic(ORACLE_SUB_TASKS, bootStrapServer, partitions);
@@ -234,7 +230,7 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
       for (int i = 1; i <= subTasks; i++) {
         OracleTaskRequest<OracleSettings> event = getTaskRequest(subTasks, i);
         event.setSettings(settings);
-        producer.send(topic, event);
+        producer.send(topic, "key-" + i, event);
       }
       producer.commitTransaction();
     }
@@ -248,6 +244,11 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
     e.setTotalPages(subTasks);
     e.setToTopic(taskRequest.getToTopic());
     e.setSettings(taskRequest.getSettings());
+    e.setExecutionId(taskRequest.getExecutionId());
+    e.setInputParams(taskRequest.getInputParams());
+    e.setStartDate(taskRequest.getStartDate());
+    e.setWfInstUid(taskRequest.getWfInstUid());
+    e.setNodeUid(taskRequest.getNodeUid());
     e.setWfUid(taskRequest.getWfUid());
     return e;
   }
@@ -263,13 +264,6 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
   @Override
   protected OracleTaskRequest getTaskRequest(String eventJson) {
     return GsonUtil.getDBSettingsEvent(eventJson);
-  }
-
-  protected List<HashMap<String, Object>> getSchema(String tableName) throws Exception {
-    if (schemaCache.get(tableName) != null) {
-      return schemaCache.get(tableName);
-    }
-    return schemas.getSchema(tableName);
   }
 
   protected Data populateData(ResultSet rs, OracleSettings settings) throws Exception {

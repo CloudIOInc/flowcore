@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 
 import com.google.common.io.Resources;
 import com.google.gson.JsonArray;
@@ -13,7 +14,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-public class SchemaReader {
+public class ReaderUtil {
   //SELECT '{"fieldName":'||COLUMN_NAME || ', "type":' ||DATA_TYPE || ',"length":' || DATA_LENGTH || ', "scale":'|| DATA_PRECISION || '},' FROM ALL_TAB_COLS  WHERE table_name ='DEPARTMENTS';  
   public List<HashMap<String, Object>> getSchema(String tableName) throws Exception {
     List<HashMap<String, Object>> schema = new ArrayList<HashMap<String, Object>>();
@@ -45,5 +46,13 @@ public class SchemaReader {
 
     }
     throw new Exception("No schema found for - [" + tableName + "]");
+  }
+
+  public Properties getDBProperties() throws Exception {
+    InputStream inputStream = Resources.getResource("application.properties").openStream();
+    Properties prop = null;
+    prop = new Properties();
+    prop.load(inputStream);
+    return prop;
   }
 }

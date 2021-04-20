@@ -10,10 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.InterruptException;
-import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -42,7 +39,7 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
 
   InputTask(String taskCode) {
     this.taskCode = taskCode;
-    this.eventTopic = taskCode + "-events";
+    this.eventTopic = taskCode;
     this.groupId = taskCode + "-grId";
   }
 
@@ -123,39 +120,6 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
     logger.debug("Stopped event consumer for {} task ", taskCode);
   }
 
-  protected Throwable commitAndHandleErrors(TaskConsumer consumer, TopicPartition partition,
-      List<ConsumerRecord<String, String>> partitionRecords) {
-    Throwable ex = null;
-    try {
-
-      if (partitionRecords.size() > 0) {
-        long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-        consumer.commitSync(
-            Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
-        logger.info("commiting offset - {}, partition - {}", lastOffset, partition);
-      }
-    } catch (WakeupException | InterruptException e) {
-      //throw e;
-    } catch (Throwable e) {
-      logger.catching(e);
-      if (ex == null) {
-        ex = e;
-      }
-      try {
-        logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
-            partitionRecords.get(0).offset(),
-            partitionRecords.get(partitionRecords.size() - 1).offset(),
-            partition.toString());
-
-        consumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
-      } catch (Throwable e1) {
-        logger.error(e1);
-        consumer.restartBeforeNextPoll();
-      }
-    }
-    return ex;
-  }
-
   protected abstract T getTaskRequest(String eventSting);
 
   private void handleEvent(T event) throws Exception { // new event from wf engine
@@ -169,8 +133,10 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
     try {
       try (Producer producer = Producer.get()) {
         producer.beginTransaction();
+        int i = 0;
         for (Data obj : data) {
-          producer.send(taskRequest.getToTopic(), obj);
+          i++;
+          producer.send(taskRequest.getToTopic(), "key-" + i, obj);
         }
         producer.commitTransaction();
       }
