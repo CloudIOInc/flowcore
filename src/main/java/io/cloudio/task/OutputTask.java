@@ -4,6 +4,7 @@ package io.cloudio.task;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -51,42 +52,44 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
 
   public void start() {
     producer = Producer.get();
-    eventConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
-    eventConsumer.createConsumer(); // TODO : Revisit
-    eventConsumer.subscribe();// TODO: Revisit
-    subscribeEvent(eventTopic); // listen to workflow engine for instructions
+    eventConsumer = new TaskConsumer(groupId + "-" + UUID.randomUUID(), Collections.singleton(eventTopic));
+    eventConsumer.createConsumer();
+    eventConsumer.subscribe();
+    subscribeEvent(eventTopic);
   }
 
   void subscribeEvent(String eventTopic) {
     Throwable ex = null;
 
     try {
-      ConsumerRecords<String, String> events = eventConsumer.poll();
-      if (events != null && events.count() > 0) {
-        for (TopicPartition partition : events.partitions()) {
-          List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
-          if (partitionRecords.size() == 0) {
-            continue;
-          }
-          if (logger.isInfoEnabled()) {
-            logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
-                partitionRecords.get(0).offset(),
-                partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
-          }
-
-          for (ConsumerRecord<String, String> record : partitionRecords) {
-            String eventSting = record.value();
-            if (eventSting == null) {
+      while (true) {
+        ConsumerRecords<String, String> events = eventConsumer.poll();
+        if (events != null && events.count() > 0) {
+          for (TopicPartition partition : events.partitions()) {
+            List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
+            if (partitionRecords.size() == 0) {
               continue;
             }
-            TaskRequest<Settings> eventObj = GsonUtil.getEventObject(eventSting);
-            handleEvent(eventObj);
-          }
+            if (logger.isInfoEnabled()) {
+              logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
+                  partitionRecords.get(0).offset(),
+                  partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
+            }
 
-          ex = commitAndHandleErrors(eventConsumer, partition, partitionRecords);
-        }
-        if (ex != null) {
-          throw ex;
+            for (ConsumerRecord<String, String> record : partitionRecords) {
+              String eventSting = record.value();
+              if (eventSting == null) {
+                continue;
+              }
+              TaskRequest<Settings> eventObj = GsonUtil.getEventObject(eventSting);
+              handleEvent(eventObj);
+            }
+
+            ex = commitAndHandleErrors(eventConsumer, partition, partitionRecords);
+          }
+          if (ex != null) {
+            throw ex;
+          }
         }
       }
     } catch (Throwable e) {
@@ -98,7 +101,15 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
   private void handleEvent(TaskRequest<Settings> event) { // new event from wf engine
     unsubscribeEvent();
     this.event = (E) event;
-    subscribeData(event.getFromTopic());
+    if (dataConsumer == null) {
+      dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(event.getFromTopic()));
+      dataConsumer.createConsumer();
+      dataConsumer.subscribe();
+      executorService.execute(() -> subscribeData(event.getFromTopic()));
+    } else {
+      dataConsumer.start();
+    }
+
   }
 
   protected void post(List<O> data) throws Exception {
@@ -113,17 +124,12 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
   protected void unsubscribeData() {
     dataConsumer.close();
     eventConsumer.start();
-    eventConsumer.wakeup();
-    subscribeEvent(eventTopic);
+    // eventConsumer.wakeup();
+    //subscribeEvent(eventTopic);
   }
 
   private void subscribeData(String fromTopic) {
     Throwable ex = null;
-    if (dataConsumer == null) {
-      dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(fromTopic));
-      dataConsumer.createConsumer();
-      dataConsumer.subscribe();
-    }
     while (true) {
       if (dataConsumer.canRun()) {
         try {

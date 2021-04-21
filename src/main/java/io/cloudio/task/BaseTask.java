@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -20,10 +23,8 @@ import org.apache.logging.log4j.Logger;
 import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
-import io.cloudio.messages.TaskStartResponse;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.JsonUtils;
-import io.cloudio.util.KafkaUtil;
 import io.cloudio.util.ReaderUtil;
 
 public class BaseTask {
@@ -31,43 +32,52 @@ public class BaseTask {
   private static Logger logger = LogManager.getLogger(BaseTask.class);
   private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
   ReaderUtil readerUtil = new ReaderUtil();
+  static ExecutorService executorService = Executors.newFixedThreadPool(8);
 
+  public BaseTask() {
+    addShutdonwHook();
+  }
+
+  /*
+  {
+    "appUid": "cloudio",
+    "endDate": "2021-04-20T09:51:36.109358Z",
+    "executionId": 1,
+    "nodeUid": "oracle output",
+    "orgUid": "cloudio",
+    "outcome": {
+      "status": "Success"
+    },
+    "output": {},
+    "startDate": "2021-04-20T09:51:27.109358Z",
+    "version": 1,
+    "wfInstUid": "56b7c93b-996e-44db-923a-1b75aef76142",
+    "wfUid": "2c678365-b3f4-4194-b7ac-262e27c48379"
+  }
+  */
   protected void sendTaskEndResponse(TaskRequest taskRequest) throws Exception {
     TaskEndResponse response = new TaskEndResponse();
+    response.setAppUid(taskRequest.getAppUid());
+    response.setEndDate(JsonUtils.dateToJsonString(new Date()));
     response.setExecutionId(taskRequest.getExecutionId());
     response.setNodeUid(taskRequest.getNodeUid());
-    response.setWfInstUid(taskRequest.getWfInstUid());
-    response.setWfUid(taskRequest.getWfUid());
-    response.setTaskType(taskRequest.getTaskType());
-    response.setStartDate(taskRequest.getStartDate());
+    response.setOrgUid(taskRequest.getOrgUid());
     Map<String, String> outCome = new HashMap<String, String>();
     outCome.put("status", "Success");
     response.setOutCome(outCome);
-    response.setEndDate(JsonUtils.dateToJsonString(new Date()));
-    try (Producer p = Producer.get()) {
-      p.beginTransaction();
-      p.send(WF_EVENTS_TOPIC, response);
-      p.commitTransaction();
-    }
-    logger.info("Sending task end response  - {}", response);
-  }
-
-  protected void sendTaskStartResponse(TaskRequest taskRequest, String groupId) throws Exception {
-    TaskStartResponse response = new TaskStartResponse();
-    response.setExecutionId(taskRequest.getExecutionId());
-    response.setNodeUid(taskRequest.getNodeUid());
+    response.setOutput(new HashMap<String, Object>());
+    response.setStartDate(taskRequest.getStartDate());
     response.setWfInstUid(taskRequest.getWfInstUid());
     response.setWfUid(taskRequest.getWfUid());
-    response.setTaskType(taskRequest.getTaskType());
-    response.setStartDate(taskRequest.getStartDate());
-    List<Map<String, Integer>> offsets = KafkaUtil.getOffsets(taskRequest.getToTopic(), groupId, false);
-    response.setFromTopicStartOffsets(offsets);
+    response.setVersion(taskRequest.getVersion());
+
     try (Producer p = Producer.get()) {
       p.beginTransaction();
       p.send(WF_EVENTS_TOPIC, response);
       p.commitTransaction();
     }
-    logger.info("Sending task start response  - {}", response);
+    logger.info("Sending task end response  for - {}-{}-{} ", taskRequest.getNodeType(), taskRequest.getTaskType(),
+        taskRequest.getWfInstUid());
   }
 
   protected Throwable commitAndHandleErrors(TaskConsumer consumer, TopicPartition partition,
@@ -112,6 +122,21 @@ public class BaseTask {
 
   protected Properties getDBProperties() throws Exception {
     return readerUtil.getDBProperties();
+  }
+
+  public void addShutdonwHook() {
+    Runtime.getRuntime().addShutdownHook(new Thread() {
+      @Override
+      public void run() {
+        try {
+          executorService.shutdown();
+          executorService.awaitTermination(1, TimeUnit.MINUTES);
+          Thread.sleep(1 * 60 * 1000);
+        } catch (Exception e) {
+          //ignore
+        }
+      }
+    });
   }
 
 }

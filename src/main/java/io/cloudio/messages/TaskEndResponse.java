@@ -8,15 +8,42 @@ public class TaskEndResponse {
   private int executionId;
   private String endDate;
   private Map<String, String> outCome;
-  private Map<String, Object> outPut;
+  private Map<String, Object> output;
   private String nodeUid;
   private String startDate;
-  private String taskType;
   private String fromTopic;
   private List<Map<Integer, Integer>> fromTopicStartOffsets;
   private String toTopic;
   private String wfInstUid;
   private String wfUid;
+  private Integer version;
+
+  public Integer getVersion() {
+    return version;
+  }
+
+  public void setVersion(Integer version) {
+    this.version = version;
+  }
+
+  public String getAppUid() {
+    return appUid;
+  }
+
+  public void setAppUid(String appUid) {
+    this.appUid = appUid;
+  }
+
+  public String getOrgUid() {
+    return orgUid;
+  }
+
+  public void setOrgUid(String orgUid) {
+    this.orgUid = orgUid;
+  }
+
+  private String appUid;
+  private String orgUid;
 
   public int getExecutionId() {
     return executionId;
@@ -40,14 +67,6 @@ public class TaskEndResponse {
 
   public void setStartDate(String startDate) {
     this.startDate = startDate;
-  }
-
-  public String getTaskType() {
-    return taskType;
-  }
-
-  public void setTaskType(String taskType) {
-    this.taskType = taskType;
   }
 
   public String getFromTopic() {
@@ -106,12 +125,12 @@ public class TaskEndResponse {
     this.outCome = outCome;
   }
 
-  public Map<String, Object> getOutPut() {
-    return outPut;
+  public Map<String, Object> getOutput() {
+    return output;
   }
 
-  public void setOutPut(Map<String, Object> outPut) {
-    this.outPut = outPut;
+  public void setOutput(Map<String, Object> output) {
+    this.output = output;
   }
 
 }

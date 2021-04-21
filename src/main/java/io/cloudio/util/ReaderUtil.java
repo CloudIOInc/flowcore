@@ -49,7 +49,7 @@ public class ReaderUtil {
   }
 
   public Properties getDBProperties() throws Exception {
-    InputStream inputStream = Resources.getResource("application.properties").openStream();
+    InputStream inputStream = Resources.getResource("io.properties").openStream();
     Properties prop = null;
     prop = new Properties();
     prop.load(inputStream);

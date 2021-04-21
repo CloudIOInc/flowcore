@@ -7,9 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -27,15 +24,14 @@ import io.cloudio.messages.OracleTaskRequest;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.GsonUtil;
-import io.cloudio.util.Util;
 
 public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettings>, Data> {
   private static Logger logger = LogManager.getLogger(OracleInputTask.class);
   private static final String ORACLE_SUBTASK_STATUS = "oracle_subtask_status";
   private static final String ORACLE_SUB_TASKS = "oracle_sub_tasks";
+  private static final Integer PARTITION_SIZE = 1000;
   private TaskConsumer subTaskConsumer;
   private TaskConsumer subTaskStatuseventConsumer;
-  static ExecutorService executorService = Executors.newFixedThreadPool(8);
   private Integer totalSubtask;
   private AtomicInteger subtask_recv_count = new AtomicInteger(0);
 
@@ -49,27 +45,12 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
     super(taskCode);
   }
 
-  public abstract Integer getCountSql(OracleSettings settings, String tableName) throws Exception;
+  public abstract Integer getCountSql(String tableName) throws Exception;
 
   public abstract List<Data> queryData(OracleTaskRequest<OracleSettings> event) throws Exception;
 
   public void start(String bootStrapServer, int partition) throws Exception {
     super.start(bootStrapServer, partition);
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        try {
-          executorService.shutdown();
-          executorService.awaitTermination(1, TimeUnit.MINUTES);
-          Thread.sleep(1 * 60 * 1000);
-          Util.closeQuietly(subTaskStatuseventConsumer);
-          Util.closeQuietly(subTaskConsumer);
-          Util.closeQuietly(taskConsumer);
-        } catch (Exception e) {
-          //ignore
-        }
-      }
-    });
   }
 
   private void createSubTaskStatusConsumer() {
@@ -115,7 +96,7 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
                     partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
               }
               subtask_recv_count.addAndGet(partitionRecords.size());
-              logger.info("Total subtask -{}, recv count -{}", totalSubtask, subtask_recv_count.get());
+              logger.info("Total subtask - {}, recv count - {}", totalSubtask, subtask_recv_count.get());
               if (totalSubtask == subtask_recv_count.get()) {
                 //send Task End Response
                 //send EndMessage to each of the partitions in Data Topic
@@ -202,34 +183,30 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
 
   @Override
   public void handleData(TaskRequest<OracleSettings> event) throws Exception {
-    OracleSettings s = event.getSettings();
-    createSubTasks(s);
+    createSubTasks(event.getTableName());
     sendTaskStartResponse(taskRequest, groupId);
     if (isLeader.get()) {
       createSubTaskStatusConsumer();
     }
   }
 
-  private void createSubTasks(OracleSettings settings) {
+  private void createSubTasks(String tableName) {
     try {
-      String tableName = settings.getTableName();
-      Integer partitionSize = settings.getPartitionSize();
-      Integer rowCount = getCountSql(settings, tableName);
-      Integer subTasks = getTasks(rowCount, partitionSize);
+      Integer rowCount = getCountSql(tableName);
+      Integer subTasks = getTasks(rowCount, PARTITION_SIZE);
       this.totalSubtask = subTasks;
-      produceSubTaskMessages(subTasks, settings, ORACLE_SUB_TASKS);
+      produceSubTaskMessages(subTasks, ORACLE_SUB_TASKS);
     } catch (Exception e) {
       logger.error("Error while creating sub tasks - ", e.getMessage());
       throw new CloudIOException(e);
     }
   }
 
-  private void produceSubTaskMessages(int subTasks, OracleSettings settings, String topic) throws Exception {
+  private void produceSubTaskMessages(int subTasks, String topic) throws Exception {
     try (Producer producer = Producer.get()) {
       producer.beginTransaction();
       for (int i = 1; i <= subTasks; i++) {
         OracleTaskRequest<OracleSettings> event = getTaskRequest(subTasks, i);
-        event.setSettings(settings);
         producer.send(topic, "key-" + i, event);
       }
       producer.commitTransaction();
@@ -239,9 +216,10 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
   private OracleTaskRequest<OracleSettings> getTaskRequest(int subTasks, int i) {
     OracleTaskRequest<OracleSettings> e = new OracleTaskRequest<OracleSettings>();
     e.setPageNo(i);
-    e.setOffset((i - 1) * taskRequest.getSettings().getPartitionSize());
-    e.setLimit(i * taskRequest.getSettings().getPartitionSize());
+    e.setOffset((i - 1) * PARTITION_SIZE);
+    e.setLimit(i * PARTITION_SIZE);
     e.setTotalPages(subTasks);
+    e.setInputParams(taskRequest.getInputParams());
     e.setToTopic(taskRequest.getToTopic());
     e.setSettings(taskRequest.getSettings());
     e.setExecutionId(taskRequest.getExecutionId());
@@ -263,12 +241,12 @@ public abstract class OracleInputTask extends InputTask<TaskRequest<OracleSettin
 
   @Override
   protected OracleTaskRequest getTaskRequest(String eventJson) {
-    return GsonUtil.getDBSettingsEvent(eventJson);
+    return GsonUtil.getOralceTaskRequestEvent(eventJson);
   }
 
-  protected Data populateData(ResultSet rs, OracleSettings settings) throws Exception {
+  protected Data populateData(ResultSet rs, String tableName) throws Exception {
     Data d = new Data();
-    List<HashMap<String, Object>> schema = getSchema(settings.getTableName());
+    List<HashMap<String, Object>> schema = getSchema(tableName);
     for (int i = 0; i < schema.size(); i++) {
       Map<String, Object> field = schema.get(i);
       String fieldName = (String) field.get("fieldName");

@@ -4,6 +4,7 @@ package io.cloudio.task;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -18,6 +19,7 @@ import io.cloudio.consumer.DataConsumer;
 import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.messages.Settings;
 import io.cloudio.messages.TaskRequest;
+import io.cloudio.messages.TaskStartResponse;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.GsonUtil;
 import io.cloudio.util.KafkaUtil;
@@ -249,6 +251,47 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
 
   protected void createTopic(String eventTopic, String bootStrapServer, int partitions) throws Exception {
     KafkaUtil.createTopic(KafkaUtil.getAdminClient(bootStrapServer), eventTopic, partitions);
+  }
+
+  /*
+  // transform
+  {
+    "appUid": "cloudio",
+    "executionId": 1,
+    "fromTopic": "data_1",
+    "fromTopicStartOffsets": [{ "partition": 0, "offset": 234 }, { "partition": 1, "offset": 333 }],
+    "nodeUid": "oracle transform",
+    "orgUid": "cloudio",
+    "startDate": "2021-04-20T09:51:06.109358Z",
+    "toTopic": "data_2",
+    "version": 1,
+    "wfInstUid": "56b7c93b-996e-44db-923a-1b75aef76142",
+    "wfUid": "2c678365-b3f4-4194-b7ac-262e27c48379"
+  }
+  */
+  protected void sendTaskStartResponse(TaskRequest taskRequest, String groupId) throws Exception {
+
+    TaskStartResponse response = new TaskStartResponse();
+    response.setAppUid(taskRequest.getAppUid());
+    response.setExecutionId(taskRequest.getExecutionId());
+    response.setStartDate(taskRequest.getStartDate());
+    response.setNodeUid(taskRequest.getNodeUid());
+    response.setFromTopic(taskRequest.getFromTopic());
+    response.setOrgUid(taskRequest.getOrgUid());
+    List<Map<String, Integer>> offsets = KafkaUtil.getOffsets(taskRequest.getToTopic(), groupId, false);
+    response.setFromTopicStartOffsets(offsets);
+    try (Producer p = Producer.get()) {
+      p.beginTransaction();
+      p.send(WF_EVENTS_TOPIC, response);
+      p.commitTransaction();
+    }
+    response.setVersion(taskRequest.getVersion());
+    response.setToTopic(taskRequest.getToTopic());
+    response.setWfInstUid(taskRequest.getWfInstUid());
+    response.setWfUid(taskRequest.getWfUid());
+
+    logger.info("Sending Transform end response  for - {}-{} ", taskRequest.getNodeType(),
+        taskRequest.getWfInstUid());
   }
 
 }

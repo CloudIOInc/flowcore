@@ -18,6 +18,7 @@ import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.exceptions.CloudIOException;
 import io.cloudio.messages.Settings;
 import io.cloudio.messages.TaskRequest;
+import io.cloudio.messages.TaskStartResponse;
 import io.cloudio.producer.Producer;
 import io.cloudio.task.Data.EventType;
 import io.cloudio.util.KafkaUtil;
@@ -170,6 +171,47 @@ public abstract class InputTask<T extends TaskRequest<? extends Settings>, O ext
       p.commitTransaction();
       logger.info("Sending end data message for - {}", taskRequest.getToTopic());
     }
+  }
+
+  /*
+  
+  // input
+  {
+  "appUid": "cloudio",
+  "executionId": 1,
+  "nodeUid": "oracle input",
+  "orgUid": "cloudio",
+  "startDate": "2021-04-20T09:51:06.109358Z",
+  "toTopic": "data_1",
+  "version": 1,
+  "wfInstUid": "56b7c93b-996e-44db-923a-1b75aef76142",
+  "wfUid": "2c678365-b3f4-4194-b7ac-262e27c48379",
+  "fromTopicStartOffsets": [{ "partition": 0, "offset": 122 }, { "partition": 1, "offset": 100 }]
+  }
+  */
+  protected void sendTaskStartResponse(TaskRequest taskRequest, String groupId) throws Exception {
+
+    TaskStartResponse response = new TaskStartResponse();
+    response.setAppUid(taskRequest.getAppUid());
+    response.setExecutionId(taskRequest.getExecutionId());
+    response.setStartDate(taskRequest.getStartDate());
+    response.setNodeUid(taskRequest.getNodeUid());
+    response.setOrgUid(taskRequest.getOrgUid());
+    List<Map<String, Integer>> offsets = KafkaUtil.getOffsets(taskRequest.getToTopic(), groupId, false);
+    response.setFromTopicStartOffsets(offsets);
+    response.setVersion(taskRequest.getVersion());
+    response.setToTopic(taskRequest.getToTopic());
+    response.setWfInstUid(taskRequest.getWfInstUid());
+    response.setWfUid(taskRequest.getWfUid());
+
+    try (Producer p = Producer.get()) {
+      p.beginTransaction();
+      p.send(WF_EVENTS_TOPIC, response);
+      p.commitTransaction();
+    }
+
+    logger.info("Sending Input start response  for - {}-{} ", taskRequest.getNodeType(),
+        taskRequest.getWfInstUid());
   }
 
 }
