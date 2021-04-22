@@ -4,6 +4,7 @@ package io.cloudio.task;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -24,7 +25,9 @@ import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
+import io.cloudio.task.Data.EventType;
 import io.cloudio.util.JsonUtils;
+import io.cloudio.util.KafkaUtil;
 import io.cloudio.util.ReaderUtil;
 
 public class BaseTask {
@@ -32,10 +35,13 @@ public class BaseTask {
   private static Logger logger = LogManager.getLogger(BaseTask.class);
   private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
   ReaderUtil readerUtil = new ReaderUtil();
+  Properties inputProps = null;
   static ExecutorService executorService = Executors.newFixedThreadPool(8);
+  protected String bootStrapServer;
+  protected int partitions;
 
   public BaseTask() {
-    addShutdonwHook();
+    addShutdownHook();
   }
 
   /*
@@ -55,7 +61,7 @@ public class BaseTask {
     "wfUid": "2c678365-b3f4-4194-b7ac-262e27c48379"
   }
   */
-  protected void sendTaskEndResponse(TaskRequest taskRequest) throws Exception {
+  protected void sendTaskEndResponse(TaskRequest taskRequest, boolean isError) throws Exception {
     TaskEndResponse response = new TaskEndResponse();
     response.setAppUid(taskRequest.getAppUid());
     response.setEndDate(JsonUtils.dateToJsonString(new Date()));
@@ -63,7 +69,11 @@ public class BaseTask {
     response.setNodeUid(taskRequest.getNodeUid());
     response.setOrgUid(taskRequest.getOrgUid());
     Map<String, String> outCome = new HashMap<String, String>();
-    outCome.put("status", "Success");
+    if (isError) {
+      outCome.put("status", "Error");
+    } else {
+      outCome.put("status", "Success");
+    }
     response.setOutCome(outCome);
     response.setOutput(new HashMap<String, Object>());
     response.setStartDate(taskRequest.getStartDate());
@@ -114,29 +124,51 @@ public class BaseTask {
   }
 
   protected List<HashMap<String, Object>> getSchema(String tableName) throws Exception {
-    if (schemaCache.get(tableName) != null) {
-      return schemaCache.get(tableName);
+    List<HashMap<String, Object>> map = schemaCache.get(tableName);
+    if (map == null) {
+      map = readerUtil.getSchema(tableName);
+      schemaCache.put(tableName, map);
     }
-    return readerUtil.getSchema(tableName);
+    return map;
   }
 
   protected Properties getDBProperties() throws Exception {
-    return readerUtil.getDBProperties();
+    if (inputProps == null) {
+      inputProps = readerUtil.getDBProperties();
+    }
+    return inputProps;
   }
 
-  public void addShutdonwHook() {
+  public void addShutdownHook() {
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
         try {
+          logger.info("Closing resources!!");
           executorService.shutdown();
           executorService.awaitTermination(1, TimeUnit.MINUTES);
-          Thread.sleep(1 * 60 * 1000);
+          Thread.sleep(1 * 20 * 1000);
         } catch (Exception e) {
           //ignore
         }
       }
     });
+  }
+
+  protected void sendEndMessage(TaskRequest taskRequest, String groupId) throws Exception {
+    Data endMessage = new Data();
+    endMessage.setEnd(EventType.End);
+    List<Map<String, Integer>> offsets = KafkaUtil.getOffsets(taskRequest.getToTopic(), groupId, false);
+    try (Producer p = Producer.get()) {
+      p.beginTransaction();
+      Iterator<Map<String, Integer>> ite = offsets.listIterator();
+      while (ite.hasNext()) {
+        Integer partition = ite.next().get("partition");
+        p.send(taskRequest.getToTopic(), partition, null, endMessage);
+      }
+      p.commitTransaction();
+      logger.info("Sending end data message for - {}", taskRequest.getToTopic());
+    }
   }
 
 }

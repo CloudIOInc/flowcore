@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -29,6 +30,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
 
   private DataConsumer dataConsumer;
   private TaskConsumer eventConsumer;
+  private String bootStrapServer;
   private Producer producer;
   protected String groupId;
 
@@ -50,9 +52,11 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
 
   public abstract void handleData(List<Data> data) throws Exception;
 
-  public void start() {
+  public void start(String bootStrapServer) {
     producer = Producer.get();
     eventConsumer = new TaskConsumer(groupId + "-" + UUID.randomUUID(), Collections.singleton(eventTopic));
+    eventConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
+    this.bootStrapServer = bootStrapServer;
     eventConsumer.createConsumer();
     eventConsumer.subscribe();
     subscribeEvent(eventTopic);
@@ -103,6 +107,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
     this.event = (E) event;
     if (dataConsumer == null) {
       dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(event.getFromTopic()));
+      dataConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
       executorService.execute(() -> subscribeData(event.getFromTopic()));
@@ -126,6 +131,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
     eventConsumer.start();
     // eventConsumer.wakeup();
     //subscribeEvent(eventTopic);
+    logger.info("unsubscribe DataConsumer - {}", dataConsumer.getName());
   }
 
   private void subscribeData(String fromTopic) {
@@ -154,7 +160,11 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
                 list.add(data);
               }
               if (list.size() > 0) {
-                this.handleData(list);
+                try {
+                  this.handleData(list);
+                } catch (Throwable t) {
+                  sendTaskEndResponse(event, true);
+                }
               }
               ex = commitDataConsumer(ex, partition, partitionRecords, list);
             }

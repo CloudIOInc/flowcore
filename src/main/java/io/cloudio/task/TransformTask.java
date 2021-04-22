@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -34,7 +35,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
   private TaskConsumer taskConsumer;
   private String eventConsumerGroupId;
   private String dataConsumerGroupId;
-
+  private String bootStrapServer;
   private static Logger logger = LogManager.getLogger(TransformTask.class);
 
   public TransformTask(String taskCode) {
@@ -59,6 +60,8 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
     logger.info("TransformTask : start");
     createTopic(eventTopic, bootStrapServer, partitions);
     taskConsumer = new TaskConsumer(eventConsumerGroupId, Collections.singleton(eventTopic));
+    taskConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
+    this.bootStrapServer = bootStrapServer;
     taskConsumer.createConsumer(); // TODO : Revisit
     taskConsumer.subscribe();// TODO: Revisit
     subscribeEvent(eventTopic); // listen to workflow engine for instructions
@@ -167,6 +170,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
     // TODO : handle while -> true
     if (dataConsumer == null) {
       dataConsumer = new DataConsumer(dataConsumerGroupId, Collections.singleton(fromTopic));
+      dataConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
     }

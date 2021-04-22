@@ -23,7 +23,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -46,7 +45,7 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable {
 
   public static Properties getProperties(String groupId) {
     Properties properties = new Properties();
-    properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+    // properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
     properties.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 60_000);
     properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
     properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -69,7 +68,6 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable {
 
   private volatile boolean closed = false;
   protected KafkaConsumer<K, V> consumer;
-  private long errorCount = 0;
   protected String groupId;
   private CountDownLatch latch = null;
   protected final Monitor monitor = new Monitor();
