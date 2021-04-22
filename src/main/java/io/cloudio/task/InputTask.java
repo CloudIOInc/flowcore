@@ -29,13 +29,13 @@ public abstract class InputTask extends BaseTask {
     Util.createTopic(Util.getAdminClient(bootStrapServer), eventTopic, partitions);
   }
 
-  public void handleEvent(TaskRequest event) throws Throwable {
+  public void handleEvent() throws Throwable {
     unsubscribeEvent();
     try {
       handleData(taskRequest);
     } catch (Throwable t) {
       logger.catching(t);
-      sendTaskEndResponse(event, true);
+      sendTaskEndResponse(taskRequest, true);
     }
     startEvent();
   }

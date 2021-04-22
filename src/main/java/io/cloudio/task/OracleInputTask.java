@@ -29,11 +29,11 @@ public abstract class OracleInputTask extends InputTask {
     super(taskCode);
   }
 
-  public abstract void executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
-      Map<String, Object> inputState);
+  public abstract Map<String, Object> executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
+      Map<String, Object> inputState) throws Exception;
 
-  public void start(String bootStrapServer, int partition) throws Exception {
-    super.start(bootStrapServer, partition);
+  public void start(String bootStrapServer) throws Exception {
+    super.start(bootStrapServer);
   }
 
   @Override

@@ -22,7 +22,7 @@ public abstract class OracleOutputTask extends OutputTask {
   }
 
   public abstract void executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
-      Map<String, Object> inputState, List<Data> dataList);
+      Map<String, Object> inputState, List<Data> dataList) throws Exception;
 
   public void handleData(List<Data> data) throws Exception {
     int lastIndex = data.size() - 1;

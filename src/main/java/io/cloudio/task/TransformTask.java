@@ -42,8 +42,8 @@ public abstract class TransformTask extends BaseTask {
     subscribeData(taskRequest.getFromTopic());
   }
 
-  public abstract void executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
-      Map<String, Object> inputState, List<Data> dataList);
+  public abstract Map<String, Object> executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
+      Map<String, Object> inputState, Data data) throws Exception;
 
   protected void unsubscribeData() {
     dataConsumer.close();
@@ -137,10 +137,12 @@ public abstract class TransformTask extends BaseTask {
       }
       if (dataList.size() > 0) {
         producer = Producer.get();
-        producer.beginTransaction();
-        executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
-            taskRequest.getInputState(), dataList);
-        producer.commitTransaction();
+        for (Data data : dataList) {
+          producer.beginTransaction();
+          executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
+              taskRequest.getInputState(), data);
+          producer.commitTransaction();
+        }
       }
 
     } catch (Exception e) {

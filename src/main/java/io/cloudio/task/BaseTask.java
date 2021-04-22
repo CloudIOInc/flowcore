@@ -1,6 +1,7 @@
 
 package io.cloudio.task;
 
+import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -23,6 +24,9 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.google.common.reflect.TypeToken;
+import com.google.gson.Gson;
+
 import io.cloudio.consumer.TaskConsumer;
 import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
@@ -33,6 +37,7 @@ import io.cloudio.util.Util;
 public abstract class BaseTask {
   public static final String WF_EVENTS_TOPIC = "wf_events";
   private static Logger logger = LogManager.getLogger(BaseTask.class);
+  protected static Map<String, Object> DUMMY_MAP = new HashMap<String, Object>();
   private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
   Util readerUtil = new Util();
   Properties inputProps = null;
@@ -53,9 +58,8 @@ public abstract class BaseTask {
     addShutdownHook();
   }
 
-  public void start(String bootStrapServer, int partitions) throws Exception {
+  public void start(String bootStrapServer) throws Exception {
     this.bootStrapServer = bootStrapServer;
-    this.partitions = partitions;
     taskConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
     taskConsumer.getProperties().put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
     taskConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
@@ -64,7 +68,7 @@ public abstract class BaseTask {
     subscribeEvent(eventTopic);
   }
 
-  public abstract void handleEvent(TaskRequest event) throws Throwable;
+  public abstract void handleEvent() throws Throwable;
 
   void subscribeEvent(String eventTopic) {
     Throwable ex = null;
@@ -91,7 +95,8 @@ public abstract class BaseTask {
                   continue;
                 }
                 TaskRequest taskRequest = getTaskRequest(eventSting);
-                handleEvent(taskRequest);
+                this.taskRequest = taskRequest;
+                handleEvent();
               }
               ex = commitAndHandleErrors(taskConsumer, partition, partitionRecords);
             }
@@ -112,9 +117,12 @@ public abstract class BaseTask {
     logger.debug("Stopped event consumer for {} task ", taskCode);
   }
 
-  protected TaskRequest getTaskRequest(String eventSting) {
-    return taskRequest;
+  static Gson gson = new Gson();
 
+  protected TaskRequest getTaskRequest(String eventSting) {
+    Type settingsType = new TypeToken<TaskRequest>() {
+    }.getType();
+    return gson.fromJson(eventSting, settingsType);
   }
 
   /*
