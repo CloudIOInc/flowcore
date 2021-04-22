@@ -29,10 +29,8 @@ import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
 import io.cloudio.task.Data.EventType;
 import io.cloudio.util.Util;
-import io.cloudio.util.Util;
-import io.cloudio.util.Util;
 
-public abstract class BaseTask<I, O> {
+public abstract class BaseTask {
   public static final String WF_EVENTS_TOPIC = "wf_events";
   private static Logger logger = LogManager.getLogger(BaseTask.class);
   private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
@@ -42,7 +40,7 @@ public abstract class BaseTask<I, O> {
   protected String bootStrapServer;
   protected int partitions;
 
-  protected TaskRequest<I, O> taskRequest;
+  protected TaskRequest taskRequest;
   protected String taskCode;
   protected String eventTopic;
   protected TaskConsumer taskConsumer;
@@ -66,7 +64,7 @@ public abstract class BaseTask<I, O> {
     subscribeEvent(eventTopic);
   }
 
-  public abstract void handleEvent(TaskRequest<I, O> event) throws Throwable;
+  public abstract void handleEvent(TaskRequest event) throws Throwable;
 
   void subscribeEvent(String eventTopic) {
     Throwable ex = null;
@@ -92,7 +90,7 @@ public abstract class BaseTask<I, O> {
                 if (eventSting == null) {
                   continue;
                 }
-                TaskRequest<I, O> taskRequest = getTaskRequest(eventSting);
+                TaskRequest taskRequest = getTaskRequest(eventSting);
                 handleEvent(taskRequest);
               }
               ex = commitAndHandleErrors(taskConsumer, partition, partitionRecords);
@@ -114,7 +112,7 @@ public abstract class BaseTask<I, O> {
     logger.debug("Stopped event consumer for {} task ", taskCode);
   }
 
-  protected TaskRequest<I, O> getTaskRequest(String eventSting) {
+  protected TaskRequest getTaskRequest(String eventSting) {
     return taskRequest;
 
   }
@@ -239,7 +237,7 @@ public abstract class BaseTask<I, O> {
     });
   }
 
-  protected void sendEndMessage(TaskRequest<I, O> taskRequest, String groupId) throws Exception {
+  protected void sendEndMessage(TaskRequest taskRequest, String groupId) throws Exception {
     Data endMessage = new Data();
     endMessage.setEnd(EventType.End);
     List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, false);

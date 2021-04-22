@@ -11,7 +11,7 @@ import org.apache.logging.log4j.Logger;
 
 import io.cloudio.util.Util;
 
-public abstract class OracleOutputTask<I, O> extends OutputTask<I, O> {
+public abstract class OracleOutputTask extends OutputTask {
   Util readerUtil = new Util();
   private static Logger logger = LogManager.getLogger(OracleOutputTask.class);
   public static final char QUOTE_CHAR = '"';
@@ -21,7 +21,8 @@ public abstract class OracleOutputTask<I, O> extends OutputTask<I, O> {
 
   }
 
-  public abstract void executeTask(I inputParams, O outputParams, Map<String, Object> inputState, List<Data> dataList);
+  public abstract void executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
+      Map<String, Object> inputState, List<Data> dataList);
 
   public void handleData(List<Data> data) throws Exception {
     int lastIndex = data.size() - 1;

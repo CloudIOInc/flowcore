@@ -4,7 +4,7 @@ package io.cloudio.messages;
 import java.util.List;
 import java.util.Map;
 
-public class TaskRequest<I, O> {
+public class TaskRequest {
 
   public enum TaskType {
     Input, Output, Transform, Task
@@ -87,9 +87,9 @@ public class TaskRequest<I, O> {
     */
 
   private int executionId;
-  private I inputParams;
+  private Map<String, Object> inputParams;
   private Map<String, Object> inputState;
-  private O outputParams;
+  private Map<String, Object> outputParams;
   private String nodeUid;
   private String nodeType;
   private String token;
@@ -113,11 +113,11 @@ public class TaskRequest<I, O> {
     this.executionId = executionId;
   }
 
-  public I getInputParams() {
+  public Map<String, Object> getInputParams() {
     return inputParams;
   }
 
-  public void setInputParams(I inputParams) {
+  public void setInputParams(Map<String, Object> inputParams) {
     this.inputParams = inputParams;
   }
 
@@ -193,11 +193,11 @@ public class TaskRequest<I, O> {
     this.inputState = inputState;
   }
 
-  public O getOutputParams() {
+  public Map<String, Object> getOutputParams() {
     return outputParams;
   }
 
-  public void setOutputParams(O outputParams) {
+  public void setOutputParams(Map<String, Object> outputParams) {
     this.outputParams = outputParams;
   }
 

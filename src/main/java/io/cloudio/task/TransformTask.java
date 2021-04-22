@@ -23,7 +23,7 @@ import io.cloudio.messages.TaskStartResponse;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.Util;
 
-public abstract class TransformTask<I, O> extends BaseTask<I, O> {
+public abstract class TransformTask extends BaseTask {
 
   private DataConsumer dataConsumer;
   private String dataConsumerGroupId;
@@ -42,7 +42,8 @@ public abstract class TransformTask<I, O> extends BaseTask<I, O> {
     subscribeData(taskRequest.getFromTopic());
   }
 
-  public abstract void executeTask(I inputParams, O outputParams, Map<String, Object> inputState, List<Data> dataList);
+  public abstract void executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
+      Map<String, Object> inputState, List<Data> dataList);
 
   protected void unsubscribeData() {
     dataConsumer.close();

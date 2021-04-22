@@ -18,7 +18,7 @@ import org.apache.logging.log4j.Logger;
 import io.cloudio.consumer.DataConsumer;
 import io.cloudio.messages.TaskRequest;
 
-public abstract class OutputTask<I, O> extends BaseTask<I, O> {
+public abstract class OutputTask extends BaseTask {
 
   private DataConsumer dataConsumer;
 

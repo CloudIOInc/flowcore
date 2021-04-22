@@ -9,11 +9,9 @@
  * with the terms of the license agreement you entered into with CloudIO.
  */
 
-package io.cloudio.exceptions;
+package io.cloudio.util;
 
 import java.io.Serializable;
-
-import io.cloudio.util.StringUtil;
 
 public class CloudIOException extends RuntimeException implements Serializable {
   private static final long serialVersionUID = 1L;

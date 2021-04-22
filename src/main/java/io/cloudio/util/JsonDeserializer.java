@@ -21,8 +21,6 @@ import org.apache.kafka.common.serialization.Deserializer;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import io.cloudio.task.Data;
-
 public class JsonDeserializer<T> implements Deserializer<T> {
 
   private Class<T> deserializedClass;
@@ -61,7 +59,6 @@ public class JsonDeserializer<T> implements Deserializer<T> {
   public static final Gson getDeserializer() {
     if (gsonDeserializer == null) {
       GsonBuilder gsonb = setupGsonBuilder();
-      registerTypeAdapters(gsonb);
       gsonDeserializer = gsonb.create();
     }
     return gsonDeserializer;
@@ -80,10 +77,6 @@ public class JsonDeserializer<T> implements Deserializer<T> {
 
     gsonb.serializeSpecialFloatingPointValues();
     return gsonb;
-  }
-
-  private static void registerTypeAdapters(GsonBuilder gsonb) {
-    gsonb.registerTypeAdapter(Data.class, new DataDeserializer());
   }
 
   @Override
