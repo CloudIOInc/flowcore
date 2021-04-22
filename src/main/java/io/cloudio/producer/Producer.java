@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -74,7 +75,7 @@ public class Producer extends KafkaProducer<String, Object> implements Transacti
 
   private static Producer createNewProducer() {
     long count = counter.incrementAndGet();
-    String txnId = "SB_INSTANCE_" + "_" + count;
+    String txnId = "SB_INSTANCE_" + "_" + UUID.randomUUID();
     logger.debug("Creating new Producer w/ TxnId: {}", txnId);
     return createNewProducer(txnId);
   }

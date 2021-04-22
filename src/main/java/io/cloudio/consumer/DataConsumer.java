@@ -34,8 +34,8 @@ public class DataConsumer extends BaseConsumer<String, Data> {
 
   @Override
   public String getName() {
-    // TODO Auto-generated method stub
-    return null;
+    
+    return "DataConsumer";
   }
 
   //CHANGED : Return type changed to ConsumerRecords so that task will commit if 

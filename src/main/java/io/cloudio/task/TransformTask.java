@@ -2,11 +2,13 @@
 package io.cloudio.task;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InterruptException;
@@ -32,14 +34,23 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
   private TaskConsumer taskConsumer;
   private String eventConsumerGroupId;
   private String dataConsumerGroupId;
-
+  private int taskRunId = -1;
   private static Logger logger = LogManager.getLogger(TransformTask.class);
 
   public TransformTask(String taskCode) {
+	  this(taskCode,-999);
+	    
+  }
+  
+  public TransformTask(String taskCode,int taskRunId) {
 
     this.taskCode = taskCode;
     this.eventTopic = taskCode;
-    this.eventConsumerGroupId = taskCode + "-eventGrId";
+    this.taskRunId = taskRunId;
+    //TaskId should be unique per APP/JVM in parallel processing. So as part of parallel processing
+    // we expect client to pass this taskId. If this is UUID then every time we start the task it will
+    // read all event messages from start assuming this is new consumer group.
+    this.eventConsumerGroupId = taskCode + "-eventGrId"+taskRunId; 
     this.dataConsumerGroupId = taskCode + "-dataGrId";
   }
 
@@ -57,10 +68,10 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
     logger.info("TransformTask : start");
     createTopic(eventTopic, bootStrapServer, partitions);
     taskConsumer = new TaskConsumer(eventConsumerGroupId, Collections.singleton(eventTopic));
-    taskConsumer.createConsumer(); // TODO : Revisit
-    taskConsumer.subscribe();// TODO: Revisit
+    taskConsumer.createConsumer(); 
+    taskConsumer.subscribe();
     subscribeEvent(eventTopic); // listen to workflow engine for instructions
-    // subscribeData(); //TODO: events and data consumers run in parallel
+   
   }
 
   void subscribeEvent(String eventTopic) {
@@ -70,8 +81,7 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
       while (taskConsumer.canRun()) {
         logger.info("eventConsumer poll() calling");
         ConsumerRecords<String, String> events = taskConsumer.poll();
-        // if there is no event we should trigger subscribeEvent in loop
-        // TODO : Can below code go in consumer ??
+        
         if (events != null && events.count() > 0) {
           for (TopicPartition partition : events.partitions()) {
             List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
@@ -162,15 +172,28 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
 
   private void subscribeData(String fromTopic) {
     Throwable ex = null;
-    // TODO : handle while -> true
-    if (dataConsumer == null) {
-      dataConsumer = new DataConsumer(dataConsumerGroupId, Collections.singleton(fromTopic));
-      dataConsumer.createConsumer();
-      dataConsumer.subscribe();
+    
+    dataConsumer = new DataConsumer(dataConsumerGroupId, Collections.singleton(fromTopic));
+    KafkaConsumer<String, Data> consumer = dataConsumer.createConsumer();
+    List<TopicPartition> topicPartitions = KafkaUtil.getTopicPartitions(fromTopic, dataConsumerGroupId);
+    if(taskRunId >= 0) { //for parallel processing assign specific partition
+  	  
+        for(TopicPartition partition : topicPartitions) {
+      	  if(partition.partition() == taskRunId ) {
+      		  dataConsumer.getConsumer().assign(Arrays.asList(partition));
+      		  logger.info("Assigning {} partition to from topic {}",taskRunId,fromTopic);
+      		  seek(Arrays.asList(partition), taskRequest.getFromTopicStartOffsets(), dataConsumer.getConsumer());
+      	  }
+        }
+    }else {
+    	//dataConsumer.subscribe();
+    	dataConsumer.getConsumer().assign(topicPartitions);
+    	seek(topicPartitions, taskRequest.getFromTopicStartOffsets(), dataConsumer.getConsumer());
     }
+    
     while (dataConsumer.canRun()) {
       try {
-        logger.debug("eventConsumer poll() calling");
+    	logger.info("DataConsumer poll() calling");
         ConsumerRecords<String, Data> dataRecords = dataConsumer.poll();
 
         // TODO : Can below code go in consumer ??
@@ -241,6 +264,8 @@ public abstract class TransformTask<R extends TaskRequest<?>> extends BaseTask {
     }
     List<Data> output = this.onData(taskRequest, dataList);
     post(output);
+    sendTaskEndResponse(taskRequest);
+    
   }
 
   private void unsubscribeEvent() {

@@ -1,15 +1,19 @@
 
 package io.cloudio.task;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InterruptException;
@@ -103,6 +107,31 @@ public class BaseTask {
     return ex;
   }
 
+  protected void seek(Collection<TopicPartition> partitions, List<Map<Integer, Integer>> fromTopicStartOffsets,
+		  KafkaConsumer<String, Data> consumer) {
+	  if(fromTopicStartOffsets != null) {
+		 
+		  Iterator<Map<Integer, Integer>> ite = fromTopicStartOffsets.listIterator();
+		  Map<Integer,Integer> partionOffSetMap = new HashMap<Integer, Integer>();
+	      while (ite.hasNext()) {
+	        Map<Integer, Integer> map = ite.next();
+	        partionOffSetMap.putAll(map);
+	      }
+	      for(TopicPartition partition: partitions) {
+			  int partitionNumber = partition.partition();
+    		  if(partionOffSetMap.containsKey(partitionNumber)) {
+    			  long offset = partionOffSetMap.get(partitionNumber);
+    			  if (logger.isWarnEnabled()) {
+    		          logger.warn("seeking to offset  {} for partition {} for topic {}", 
+    		        		   offset,partitionNumber,partition.topic());
+    		        }
+    			  consumer.seek(partition, offset);
+    		  }
+    	  }
+		  
+	  }
+  }
+  
   protected List<HashMap<String, Object>> getSchema(String tableName) throws Exception {
     if (schemaCache.get(tableName) != null) {
       return schemaCache.get(tableName);

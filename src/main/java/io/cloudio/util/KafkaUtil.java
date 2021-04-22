@@ -298,5 +298,27 @@ public class KafkaUtil {
 
     return offsetList;
   }
+  
+  public static List<TopicPartition> getTopicPartitions(String topicName, String groupId) {
+	Properties consumerProps = BaseConsumer.getProperties(groupId);
+	List<TopicPartition> partitions = new ArrayList<>();
+	try (KafkaConsumer<String, String> list = new KafkaConsumer<>(consumerProps)) {
 
+		Map<String, List<PartitionInfo>> topics = list.listTopics();
+		List<PartitionInfo> partitionInfos = topics.get(topicName);
+		if (partitionInfos == null) {
+			logger.warn("Partition information was not found for topic {}", topicName);
+			return null;
+		} else {
+
+			for (PartitionInfo partitionInfo : partitionInfos) {
+				TopicPartition partition = new TopicPartition(topicName, partitionInfo.partition());
+				partitions.add(partition);
+			}
+
+		}
+
+	}
+	return partitions;
+  }
 }
