@@ -9,12 +9,10 @@ import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import io.cloudio.messages.OutputSettings;
-import io.cloudio.messages.TaskRequest;
-import io.cloudio.util.ReaderUtil;
+import io.cloudio.util.Util;
 
-public abstract class OracleOutputTask extends OutputTask<TaskRequest<OutputSettings>, Data, Data> {
-  ReaderUtil readerUtil = new ReaderUtil();
+public abstract class OracleOutputTask<I, O> extends OutputTask<I, O> {
+  Util readerUtil = new Util();
   private static Logger logger = LogManager.getLogger(OracleOutputTask.class);
   public static final char QUOTE_CHAR = '"';
 
@@ -23,7 +21,7 @@ public abstract class OracleOutputTask extends OutputTask<TaskRequest<OutputSett
 
   }
 
-  public abstract void onData(TaskRequest<OutputSettings> E, List<Data> D) throws Exception;
+  public abstract void executeTask(I inputParams, O outputParams, Map<String, Object> inputState, List<Data> dataList);
 
   public void handleData(List<Data> data) throws Exception {
     int lastIndex = data.size() - 1;
@@ -33,8 +31,10 @@ public abstract class OracleOutputTask extends OutputTask<TaskRequest<OutputSett
       unsubscribeData();
       data.remove(lastIndex);
     }
-    this.onData(event, data);
-    logger.info("Processed {} events!", data.size());
+    if (data.size() > 0) {
+      executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(), taskRequest.getInputState(), data);
+      logger.info("Processed {} events!", data.size());
+    }
   }
 
   protected String getInsertQuery(String tableName) throws Exception {

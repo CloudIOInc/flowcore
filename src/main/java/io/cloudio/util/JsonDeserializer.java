@@ -12,7 +12,6 @@
 package io.cloudio.util;
 
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.Map;
@@ -24,75 +23,71 @@ import com.google.gson.GsonBuilder;
 
 import io.cloudio.task.Data;
 
-//TODO: combine Serializer and Deserializer api in common class
-
 public class JsonDeserializer<T> implements Deserializer<T> {
-	
 
-	private Class<T> deserializedClass;
+  private Class<T> deserializedClass;
 
-	private static Gson gsonMessageDeserializer, gsonDeserializer, gsonSerializerSkipNulls, gsonSerializer,
-			gsonMessageSerializer, gsonPrettySerializer;
-	static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
+  private static Gson gsonDeserializer;
+  static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 
-	public JsonDeserializer(Class<T> deserializedClass) {
-		this.deserializedClass = deserializedClass;
-	}
+  public JsonDeserializer(Class<T> deserializedClass) {
+    this.deserializedClass = deserializedClass;
+  }
 
-	public JsonDeserializer() {
-	}
+  public JsonDeserializer() {
+  }
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public void configure(Map<String, ?> map, boolean isKey) {
-		if (deserializedClass == null) {
-			if (isKey) {
-				deserializedClass = (Class<T>) map.get("keySerializedClass");
-			} else {
-				deserializedClass = (Class<T>) map.get("serializedClass");
-			}
-		}
-	}
+  @SuppressWarnings("unchecked")
+  @Override
+  public void configure(Map<String, ?> map, boolean isKey) {
+    if (deserializedClass == null) {
+      if (isKey) {
+        deserializedClass = (Class<T>) map.get("keySerializedClass");
+      } else {
+        deserializedClass = (Class<T>) map.get("serializedClass");
+      }
+    }
+  }
 
-	@Override
-	public T deserialize(String s, byte[] bytes) {
-		if (bytes == null) {
-			return null;
-		}
-		String str = new String(bytes, Constants.UTF8);
-		return getDeserializer().fromJson(str, deserializedClass);
-	}
+  @Override
+  public T deserialize(String s, byte[] bytes) {
+    if (bytes == null) {
+      return null;
+    }
+    String str = new String(bytes, Charset.defaultCharset());
+    return getDeserializer().fromJson(str, deserializedClass);
+  }
 
-	public static final Gson getDeserializer() {
-		if (gsonDeserializer == null) {
-			GsonBuilder gsonb = setupGsonBuilder();
-			registerTypeAdapters(gsonb);
-			gsonDeserializer = gsonb.create();
-		}
-		return gsonDeserializer;
-	}
+  public static final Gson getDeserializer() {
+    if (gsonDeserializer == null) {
+      GsonBuilder gsonb = setupGsonBuilder();
+      registerTypeAdapters(gsonb);
+      gsonDeserializer = gsonb.create();
+    }
+    return gsonDeserializer;
+  }
 
-	public static final GsonBuilder setupGsonBuilder() {
-		GsonBuilder gsonb = setupGsonBuilderSkipNulls();
-		gsonb.serializeNulls();
-		return gsonb;
-	}
+  public static final GsonBuilder setupGsonBuilder() {
+    GsonBuilder gsonb = setupGsonBuilderSkipNulls();
+    gsonb.serializeNulls();
+    return gsonb;
+  }
 
-	public static final GsonBuilder setupGsonBuilderSkipNulls() {
-		GsonBuilder gsonb = new GsonBuilder().setDateFormat(DATE_FORMAT);
-		gsonb.registerTypeAdapter(Date.class, new GsonUTCDateAdapter());
-		gsonb.registerTypeAdapter(Timestamp.class, new GsonUTCDateAdapter());
+  public static final GsonBuilder setupGsonBuilderSkipNulls() {
+    GsonBuilder gsonb = new GsonBuilder().setDateFormat(DATE_FORMAT);
+    gsonb.registerTypeAdapter(Date.class, new GsonUTCDateAdapter());
+    gsonb.registerTypeAdapter(Timestamp.class, new GsonUTCDateAdapter());
 
-		gsonb.serializeSpecialFloatingPointValues();
-		return gsonb;
-	}
+    gsonb.serializeSpecialFloatingPointValues();
+    return gsonb;
+  }
 
-	private static void registerTypeAdapters(GsonBuilder gsonb) {
-		gsonb.registerTypeAdapter(Data.class, new DataDeserializer());
-	}
+  private static void registerTypeAdapters(GsonBuilder gsonb) {
+    gsonb.registerTypeAdapter(Data.class, new DataDeserializer());
+  }
 
-	@Override
-	public void close() {
+  @Override
+  public void close() {
 
-	}
+  }
 }

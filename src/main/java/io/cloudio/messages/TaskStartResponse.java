@@ -12,7 +12,7 @@ public class TaskStartResponse {
   private String appUid;
   private String orgUid;
   private String startDate;
-  private String fromTopic;
+  private String fromTopic; //omit null values
   private List<Map<String, Integer>> fromTopicStartOffsets;
   private String toTopic;
   private String wfInstUid;

@@ -4,7 +4,6 @@ package io.cloudio.task;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -17,94 +16,21 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import io.cloudio.consumer.DataConsumer;
-import io.cloudio.consumer.TaskConsumer;
-import io.cloudio.messages.Settings;
 import io.cloudio.messages.TaskRequest;
-import io.cloudio.producer.Producer;
-import io.cloudio.util.GsonUtil;
 
-public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O extends Data> extends BaseTask {
-  protected E event;
-  private String taskCode;
-  protected String eventTopic;
+public abstract class OutputTask<I, O> extends BaseTask<I, O> {
 
   private DataConsumer dataConsumer;
-  private TaskConsumer eventConsumer;
-  private String bootStrapServer;
-  private Producer producer;
-  protected String groupId;
 
   private static Logger logger = LogManager.getLogger(OutputTask.class);
 
   OutputTask(String taskCode) {
-    this.taskCode = taskCode;
-    this.eventTopic = taskCode;
-    this.groupId = taskCode + "-grId";
-  }
-
-  void onStart(TaskRequest<?> event) {
-
-  }
-
-  void onEnd(TaskRequest<?> event) {
-
+    super(taskCode + "-output");
   }
 
   public abstract void handleData(List<Data> data) throws Exception;
 
-  public void start(String bootStrapServer) {
-    producer = Producer.get();
-    eventConsumer = new TaskConsumer(groupId + "-" + UUID.randomUUID(), Collections.singleton(eventTopic));
-    eventConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
-    this.bootStrapServer = bootStrapServer;
-    eventConsumer.createConsumer();
-    eventConsumer.subscribe();
-    subscribeEvent(eventTopic);
-  }
-
-  void subscribeEvent(String eventTopic) {
-    Throwable ex = null;
-
-    try {
-      while (true) {
-        ConsumerRecords<String, String> events = eventConsumer.poll();
-        if (events != null && events.count() > 0) {
-          for (TopicPartition partition : events.partitions()) {
-            List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
-            if (partitionRecords.size() == 0) {
-              continue;
-            }
-            if (logger.isInfoEnabled()) {
-              logger.info("Got {} events between {} & {} in {}", partitionRecords.size(),
-                  partitionRecords.get(0).offset(),
-                  partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
-            }
-
-            for (ConsumerRecord<String, String> record : partitionRecords) {
-              String eventSting = record.value();
-              if (eventSting == null) {
-                continue;
-              }
-              TaskRequest<Settings> eventObj = GsonUtil.getEventObject(eventSting);
-              handleEvent(eventObj);
-            }
-
-            ex = commitAndHandleErrors(eventConsumer, partition, partitionRecords);
-          }
-          if (ex != null) {
-            throw ex;
-          }
-        }
-      }
-    } catch (Throwable e) {
-      logger.catching(e);
-    }
-    logger.debug("Stopped event consumer for {} task " + taskCode);
-  }
-
-  private void handleEvent(TaskRequest<Settings> event) { // new event from wf engine
-    unsubscribeEvent();
-    this.event = (E) event;
+  public void handleEvent(TaskRequest event) {
     if (dataConsumer == null) {
       dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(event.getFromTopic()));
       dataConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
@@ -115,23 +41,6 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
       dataConsumer.start();
     }
 
-  }
-
-  protected void post(List<O> data) throws Exception {
-    // TODO: Check what if data size is large
-    producer.beginTransaction();
-    for (Data obj : data) {
-      producer.send(event.getToTopic(), obj);
-    }
-    producer.commitTransaction();
-  }
-
-  protected void unsubscribeData() {
-    dataConsumer.close();
-    eventConsumer.start();
-    // eventConsumer.wakeup();
-    //subscribeEvent(eventTopic);
-    logger.info("unsubscribe DataConsumer - {}", dataConsumer.getName());
   }
 
   private void subscribeData(String fromTopic) {
@@ -163,7 +72,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
                 try {
                   this.handleData(list);
                 } catch (Throwable t) {
-                  sendTaskEndResponse(event, true);
+                  sendTaskEndResponse(taskRequest, true);
                 }
               }
               ex = commitDataConsumer(ex, partition, partitionRecords, list);
@@ -208,8 +117,7 @@ public abstract class OutputTask<E extends TaskRequest<?>, D extends Data, O ext
     return ex;
   }
 
-  private void unsubscribeEvent() {
-    eventConsumer.close();
+  protected void unsubscribeData() {
+    dataConsumer.close();
   }
-
 }

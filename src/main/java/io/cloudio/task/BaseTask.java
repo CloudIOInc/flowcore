@@ -13,7 +13,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InterruptException;
@@ -26,22 +28,95 @@ import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
 import io.cloudio.task.Data.EventType;
-import io.cloudio.util.JsonUtils;
-import io.cloudio.util.KafkaUtil;
-import io.cloudio.util.ReaderUtil;
+import io.cloudio.util.Util;
+import io.cloudio.util.Util;
+import io.cloudio.util.Util;
 
-public class BaseTask {
+public abstract class BaseTask<I, O> {
   public static final String WF_EVENTS_TOPIC = "wf_events";
   private static Logger logger = LogManager.getLogger(BaseTask.class);
   private ConcurrentHashMap<String, List<HashMap<String, Object>>> schemaCache = new ConcurrentHashMap<>();
-  ReaderUtil readerUtil = new ReaderUtil();
+  Util readerUtil = new Util();
   Properties inputProps = null;
   static ExecutorService executorService = Executors.newFixedThreadPool(8);
   protected String bootStrapServer;
   protected int partitions;
 
-  public BaseTask() {
+  protected TaskRequest<I, O> taskRequest;
+  protected String taskCode;
+  protected String eventTopic;
+  protected TaskConsumer taskConsumer;
+  protected String groupId;
+
+  public BaseTask(String taskCode) {
+    this.taskCode = taskCode;
+    this.eventTopic = taskCode;
+    this.groupId = taskCode + "-grId";
     addShutdownHook();
+  }
+
+  public void start(String bootStrapServer, int partitions) throws Exception {
+    this.bootStrapServer = bootStrapServer;
+    this.partitions = partitions;
+    taskConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
+    taskConsumer.getProperties().put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
+    taskConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
+    taskConsumer.createConsumer();
+    taskConsumer.subscribe();
+    subscribeEvent(eventTopic);
+  }
+
+  public abstract void handleEvent(TaskRequest<I, O> event) throws Throwable;
+
+  void subscribeEvent(String eventTopic) {
+    Throwable ex = null;
+
+    try {
+      while (true) {
+        if (taskConsumer.canRun()) {
+          ConsumerRecords<String, String> events = taskConsumer.poll();
+          if (events != null && events.count() > 0) {
+            for (TopicPartition partition : events.partitions()) {
+              List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
+              if (partitionRecords.size() == 0) {
+                continue;
+              }
+              if (logger.isInfoEnabled()) {
+                logger.info("Got {} task events between {} & {} in {}", partitionRecords.size(),
+                    partitionRecords.get(0).offset(),
+                    partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
+              }
+
+              for (ConsumerRecord<String, String> record : partitionRecords) {
+                String eventSting = record.value();
+                if (eventSting == null) {
+                  continue;
+                }
+                TaskRequest<I, O> taskRequest = getTaskRequest(eventSting);
+                handleEvent(taskRequest);
+              }
+              ex = commitAndHandleErrors(taskConsumer, partition, partitionRecords);
+            }
+            if (ex != null) {
+              throw ex;
+            }
+          }
+        } else {
+          Thread.sleep(10 * 1000); //sleep for 10 seconds
+        }
+      }
+
+    } catch (
+
+    Throwable e) {
+      logger.catching(e);
+    }
+    logger.debug("Stopped event consumer for {} task ", taskCode);
+  }
+
+  protected TaskRequest<I, O> getTaskRequest(String eventSting) {
+    return taskRequest;
+
   }
 
   /*
@@ -64,7 +139,7 @@ public class BaseTask {
   protected void sendTaskEndResponse(TaskRequest taskRequest, boolean isError) throws Exception {
     TaskEndResponse response = new TaskEndResponse();
     response.setAppUid(taskRequest.getAppUid());
-    response.setEndDate(JsonUtils.dateToJsonString(new Date()));
+    response.setEndDate(Util.dateToJsonString(new Date()));
     response.setExecutionId(taskRequest.getExecutionId());
     response.setNodeUid(taskRequest.getNodeUid());
     response.setOrgUid(taskRequest.getOrgUid());
@@ -139,7 +214,16 @@ public class BaseTask {
     return inputProps;
   }
 
-  public void addShutdownHook() {
+  protected void startEvent() {
+    taskConsumer.wakeup();
+    taskConsumer.start();
+  }
+
+  protected void unsubscribeEvent() {
+    taskConsumer.close();
+  }
+
+  private void addShutdownHook() {
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
@@ -155,10 +239,10 @@ public class BaseTask {
     });
   }
 
-  protected void sendEndMessage(TaskRequest taskRequest, String groupId) throws Exception {
+  protected void sendEndMessage(TaskRequest<I, O> taskRequest, String groupId) throws Exception {
     Data endMessage = new Data();
     endMessage.setEnd(EventType.End);
-    List<Map<String, Integer>> offsets = KafkaUtil.getOffsets(taskRequest.getToTopic(), groupId, false);
+    List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, false);
     try (Producer p = Producer.get()) {
       p.beginTransaction();
       Iterator<Map<String, Integer>> ite = offsets.listIterator();

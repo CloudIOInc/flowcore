@@ -26,14 +26,14 @@ public class GsonUTCDateAdapter implements JsonSerializer<Date>, JsonDeserialize
 
   @Override
   public JsonElement serialize(Date date, Type type, JsonSerializationContext c) {
-    return new JsonPrimitive(JsonUtils.dateToJsonString(date));
+    return new JsonPrimitive(Util.dateToJsonString(date));
   }
 
   @Override
   public Date deserialize(JsonElement jsonElement, Type type, JsonDeserializationContext c) {
     try {
       String sval = jsonElement.getAsString();
-      return JsonUtils.toTimestamp6(sval);
+      return Util.toTimestamp6(sval);
     } catch (Exception e) {
       throw new JsonParseException(e);
     }

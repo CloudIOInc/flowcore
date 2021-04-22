@@ -4,12 +4,10 @@ package io.cloudio.messages;
 import java.util.List;
 import java.util.Map;
 
-import io.cloudio.exceptions.CloudIOException;
-
-public class TaskRequest<S extends Settings> {
+public class TaskRequest<I, O> {
 
   public enum TaskType {
-    Input, Output, Transform, Action
+    Input, Output, Transform, Task
   }
   /*
   
@@ -89,14 +87,15 @@ public class TaskRequest<S extends Settings> {
     */
 
   private int executionId;
-  private Map<String, Object> inputParams;
+  private I inputParams;
   private Map<String, Object> inputState;
-  private Map<String, Object> outputParams;
+  private O outputParams;
   private String nodeUid;
   private String nodeType;
+  private String token;
+  //token
   private Integer version;
   private String orgUid;
-  private S settings;
   private String startDate;
   private String taskType;
   private String fromTopic;
@@ -114,11 +113,11 @@ public class TaskRequest<S extends Settings> {
     this.executionId = executionId;
   }
 
-  public Map<String, Object> getInputParams() {
+  public I getInputParams() {
     return inputParams;
   }
 
-  public void setInputParams(Map<String, Object> inputParams) {
+  public void setInputParams(I inputParams) {
     this.inputParams = inputParams;
   }
 
@@ -128,14 +127,6 @@ public class TaskRequest<S extends Settings> {
 
   public void setNodeUid(String nodeUid) {
     this.nodeUid = nodeUid;
-  }
-
-  public S getSettings() {
-    return settings;
-  }
-
-  public void setSettings(S settings) {
-    this.settings = settings;
   }
 
   public String getStartDate() {
@@ -202,11 +193,11 @@ public class TaskRequest<S extends Settings> {
     this.inputState = inputState;
   }
 
-  public Map<String, Object> getOutputParams() {
+  public O getOutputParams() {
     return outputParams;
   }
 
-  public void setOutputParams(Map<String, Object> outputParams) {
+  public void setOutputParams(O outputParams) {
     this.outputParams = outputParams;
   }
 
@@ -242,12 +233,12 @@ public class TaskRequest<S extends Settings> {
     this.appUid = appUid;
   }
 
-  public String getTableName() {
-    if (inputParams != null && inputParams.get("tableName") != null) {
-      return (String) inputParams.get("tableName");
-    } else {
-      throw new CloudIOException("Invalid TaskRequest, tablename not found!");
-    }
+  public String getToken() {
+    return token;
+  }
+
+  public void setToken(String token) {
+    this.token = token;
   }
 
 }
