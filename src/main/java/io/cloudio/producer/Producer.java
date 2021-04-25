@@ -30,6 +30,7 @@ import org.apache.logging.log4j.Logger;
 
 import io.cloudio.task.Data;
 import io.cloudio.util.JsonSerializer;
+import io.cloudio.util.Util;
 
 public class Producer extends KafkaProducer<String, Object> implements TransactionProducer<String, Object> {
   static Logger logger = LogManager.getLogger(Producer.class);
@@ -89,7 +90,7 @@ public class Producer extends KafkaProducer<String, Object> implements Transacti
 
   public static Properties getProperties() {
     Properties properties = new Properties();
-    properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+    properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, Util.getBootstrapServer());
     properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
     properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
     properties.put(ProducerConfig.LINGER_MS_CONFIG, 100);

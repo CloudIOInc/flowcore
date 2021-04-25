@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -16,7 +15,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import io.cloudio.consumer.DataConsumer;
-import io.cloudio.messages.TaskRequest;
 
 public abstract class OutputTask extends BaseTask {
 
@@ -25,18 +23,17 @@ public abstract class OutputTask extends BaseTask {
   private static Logger logger = LogManager.getLogger(OutputTask.class);
 
   OutputTask(String taskCode) {
-    super(taskCode + "-output");
+    super(taskCode);
   }
 
   public abstract void handleData(List<Data> data) throws Exception;
 
-  public void handleEvent(TaskRequest event) {
+  public void handleEvent() {
     if (dataConsumer == null) {
-      dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(event.getFromTopic()));
-      dataConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
+      dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(taskRequest.getFromTopic()));
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
-      executorService.execute(() -> subscribeData(event.getFromTopic()));
+      executorService.execute(() -> subscribeData(taskRequest.getFromTopic()));
     } else {
       dataConsumer.start();
     }

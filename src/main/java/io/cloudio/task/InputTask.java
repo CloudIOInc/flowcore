@@ -25,8 +25,8 @@ public abstract class InputTask extends BaseTask {
 
   public abstract void handleData(TaskRequest event) throws Exception;
 
-  protected void createTopic(String eventTopic, String bootStrapServer, int partitions) throws Exception {
-    Util.createTopic(Util.getAdminClient(bootStrapServer), eventTopic, partitions);
+  protected void createTopic(String eventTopic, int partitions) throws Exception {
+    Util.createTopic(Util.getAdminClient(Util.getBootstrapServer()), eventTopic, partitions);
   }
 
   public void handleEvent() throws Throwable {
@@ -48,7 +48,8 @@ public abstract class InputTask extends BaseTask {
     response.setStartDate(taskRequest.getStartDate());
     response.setNodeUid(taskRequest.getNodeUid());
     response.setOrgUid(taskRequest.getOrgUid());
-    List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, false);
+    List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, Util.getBootstrapServer(),
+        false);
     response.setFromTopicStartOffsets(offsets);
     response.setVersion(taskRequest.getVersion());
     response.setToTopic(taskRequest.getToTopic());

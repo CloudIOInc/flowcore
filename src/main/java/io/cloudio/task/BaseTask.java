@@ -42,7 +42,6 @@ public abstract class BaseTask {
   Util readerUtil = new Util();
   Properties inputProps = null;
   static ExecutorService executorService = Executors.newFixedThreadPool(8);
-  protected String bootStrapServer;
   protected int partitions;
 
   protected TaskRequest taskRequest;
@@ -58,11 +57,10 @@ public abstract class BaseTask {
     addShutdownHook();
   }
 
-  public void start(String bootStrapServer) throws Exception {
-    this.bootStrapServer = bootStrapServer;
+  public void start() throws Exception {
     taskConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
     taskConsumer.getProperties().put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
-    taskConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
+    // taskConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
     taskConsumer.createConsumer();
     taskConsumer.subscribe();
     subscribeEvent(eventTopic);
@@ -215,7 +213,7 @@ public abstract class BaseTask {
 
   protected Properties getDBProperties() throws Exception {
     if (inputProps == null) {
-      inputProps = readerUtil.getDBProperties();
+      inputProps = Util.getDBProperties();
     }
     return inputProps;
   }
@@ -248,7 +246,8 @@ public abstract class BaseTask {
   protected void sendEndMessage(TaskRequest taskRequest, String groupId) throws Exception {
     Data endMessage = new Data();
     endMessage.setEnd(EventType.End);
-    List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, false);
+    List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, Util.getBootstrapServer(),
+        false);
     try (Producer p = Producer.get()) {
       p.beginTransaction();
       Iterator<Map<String, Integer>> ite = offsets.listIterator();

@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -26,19 +25,17 @@ import io.cloudio.util.Util;
 public abstract class TransformTask extends BaseTask {
 
   private DataConsumer dataConsumer;
-  private String dataConsumerGroupId;
-  private String bootStrapServer;
   private Producer producer;
   private AtomicBoolean consumeData = new AtomicBoolean(false);
   private static Logger logger = LogManager.getLogger(TransformTask.class);
 
   public TransformTask(String taskCode) {
-    super(taskCode + "-transform");
+    super(taskCode);
   }
 
-  public void handleEvent(TaskRequest request) throws Exception { // new event from wf engine
+  public void handleEvent() throws Exception { // new event from wf engine
     unsubscribeEvent();
-    sendTaskStartResponse(request, groupId);
+    sendTaskStartResponse(taskRequest, groupId);
     subscribeData(taskRequest.getFromTopic());
   }
 
@@ -52,8 +49,7 @@ public abstract class TransformTask extends BaseTask {
   private void subscribeData(String fromTopic) {
     Throwable ex = null;
     if (dataConsumer == null) {
-      dataConsumer = new DataConsumer(dataConsumerGroupId, Collections.singleton(fromTopic));
-      dataConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
+      dataConsumer = new DataConsumer(groupId + "-Data", Collections.singleton(fromTopic));
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
     }
@@ -105,9 +101,9 @@ public abstract class TransformTask extends BaseTask {
                       partitionRecords.get(partitionRecords.size() - 1).offset(),
                       partition.toString());
 
-                  taskConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
+                  dataConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
                 } catch (Throwable e1) {
-                  taskConsumer.restartBeforeNextPoll();
+                  dataConsumer.restartBeforeNextPoll();
                 }
               }
             }
@@ -161,6 +157,10 @@ public abstract class TransformTask extends BaseTask {
     Util.createTopic(Util.getAdminClient(bootStrapServer), eventTopic, partitions);
   }
 
+  public void post(Data data) throws Exception {
+    producer.send(taskRequest.getToTopic(), data);
+  }
+
   /*
   // transform
   {
@@ -186,7 +186,8 @@ public abstract class TransformTask extends BaseTask {
     response.setNodeUid(taskRequest.getNodeUid());
     response.setFromTopic(taskRequest.getFromTopic());
     response.setOrgUid(taskRequest.getOrgUid());
-    List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, false);
+    List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, Util.getBootstrapServer(),
+        false);
     response.setFromTopicStartOffsets(offsets);
     try (Producer p = Producer.get()) {
       p.beginTransaction();

@@ -20,8 +20,8 @@ public abstract class OracleInputTask extends InputTask {
   private Producer producer;
 
   public void createTopics() throws Exception {
-    createTopic(ORACLE_SUB_TASKS, bootStrapServer, partitions);
-    createTopic(ORACLE_SUBTASK_STATUS, bootStrapServer, partitions);
+    createTopic(ORACLE_SUB_TASKS, partitions);
+    createTopic(ORACLE_SUBTASK_STATUS, partitions);
 
   }
 
@@ -32,23 +32,23 @@ public abstract class OracleInputTask extends InputTask {
   public abstract Map<String, Object> executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
       Map<String, Object> inputState) throws Exception;
 
-  public void start(String bootStrapServer) throws Exception {
-    super.start(bootStrapServer);
+  public void start() throws Exception {
+    super.start();
   }
 
   @Override
   public void handleData(TaskRequest taskRequest) throws Exception {
     boolean isError = false;
     try {
-      sendTaskStartResponse(taskRequest, groupId);
       producer = Producer.get();
       producer.beginTransaction();
+      sendTaskStartResponse(taskRequest, groupId);
       executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
           taskRequest.getInputState());
       producer.commitTransaction();
     } catch (Exception e) {
-      producer.abortTransactionQuietly();
       logger.catching(e);
+      producer.abortTransactionQuietly();
       isError = false;
       throw e;
     } finally {

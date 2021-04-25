@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
@@ -131,9 +132,11 @@ public class Util {
     return AdminClient.create(properties);
   }
 
-  public static List<Map<String, Integer>> getOffsets(String topicName, String groupId, boolean isStart) {
+  public static List<Map<String, Integer>> getOffsets(String topicName, String groupId, String bootstrapServer,
+      boolean isStart) {
     Properties consumerProps = BaseConsumer.getProperties(groupId);
     List<Map<String, Integer>> offsetList = new ArrayList<Map<String, Integer>>();
+    consumerProps.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
     try (KafkaConsumer<String, String> list = new KafkaConsumer<>(consumerProps)) {
       // First, check if the topic exists in the list of all topics
       // First, check if the topic exists in the list of all topics
@@ -220,19 +223,42 @@ public class Util {
     throw new Exception("No schema found for - [" + tableName + "]");
   }
 
-  public Properties getDBProperties() throws Exception {
+  static Properties props = null;
 
-    InputStream inputStream = null;
-    String customFilePath = System.getProperty("custom.filepath");
-    logger.info("Custom file path - {}", customFilePath);
-    if (StringUtil.isBlank(customFilePath)) {
-      inputStream = Resources.getResource("io.properties").openStream();
-    } else {
-      inputStream = new FileInputStream(customFilePath + "/io.properties");
+  public static Properties getDBProperties() {
+    if (props == null) {
+      Properties _props = loadProps();
+      props = _props;
     }
-    Properties prop = new Properties();
-    prop.load(inputStream);
-    return prop;
+    return props;
+  }
+
+  public static String getBootstrapServer() {
+    if (props == null) {
+      Properties _props = loadProps();
+      props = _props;
+    }
+    return props.getProperty("bootstrap.server");
+  }
+
+  private static Properties loadProps() {
+    try {
+      InputStream inputStream = null;
+      String customFilePath = System.getProperty("custom.filepath");
+      logger.info("Custom file path - {}", customFilePath);
+      if (StringUtil.isBlank(customFilePath)) {
+        inputStream = Resources.getResource("io.properties").openStream();
+      } else {
+        inputStream = new FileInputStream(customFilePath + "/io.properties");
+      }
+      Properties props = new Properties();
+      props.load(inputStream);
+      return props;
+    } catch (Exception e) {
+      logger.catching(e);
+      throw new CloudIOException(e);
+    }
+
   }
 
   // date utils
@@ -424,6 +450,10 @@ public class Util {
     if (d == null) return "null";
     OffsetDateTime date = OffsetDateTime.ofInstant(d.toInstant(), ZoneOffset.systemDefault());
     return date.format(uformatter);
+  }
+
+  public static String getInsatnceIdentifier() {
+    return UUID.randomUUID().toString();
   }
 
 }

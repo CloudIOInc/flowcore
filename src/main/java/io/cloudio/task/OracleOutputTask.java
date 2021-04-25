@@ -9,12 +9,14 @@ import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import io.cloudio.producer.Producer;
 import io.cloudio.util.Util;
 
 public abstract class OracleOutputTask extends OutputTask {
   Util readerUtil = new Util();
   private static Logger logger = LogManager.getLogger(OracleOutputTask.class);
   public static final char QUOTE_CHAR = '"';
+  Producer producer;
 
   public OracleOutputTask(String taskCode) {
     super(taskCode);
@@ -25,16 +27,21 @@ public abstract class OracleOutputTask extends OutputTask {
       Map<String, Object> inputState, List<Data> dataList) throws Exception;
 
   public void handleData(List<Data> data) throws Exception {
-    int lastIndex = data.size() - 1;
-    Data lastMessage = data.get(lastIndex);
-    if (lastMessage.isEnd()) {
-      logger.info("Got end event", data.size());
-      unsubscribeData();
-      data.remove(lastIndex);
-    }
-    if (data.size() > 0) {
-      executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(), taskRequest.getInputState(), data);
-      logger.info("Processed {} events!", data.size());
+    boolean isError = false;
+    try {
+      producer = Producer.get();
+      producer.beginTransaction();
+      executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
+          taskRequest.getInputState(), data);
+      producer.commitTransaction();
+    } catch (Exception e) {
+      logger.catching(e);
+      producer.abortTransactionQuietly();
+      isError = false;
+      throw e;
+    } finally {
+      Util.closeQuietly(producer);
+      sendTaskEndResponse(taskRequest, isError);
     }
   }
 

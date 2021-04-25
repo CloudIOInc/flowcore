@@ -29,6 +29,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.CooperativeStickyAssignor;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.RebalanceInProgressException;
@@ -36,16 +37,21 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.ThreadContext;
 
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Monitor;
 
-public abstract class BaseConsumer<K, V> implements AutoCloseable {
+import io.cloudio.util.CloudIOException;
+import io.cloudio.util.Util;
+
+public abstract class BaseConsumer<K, V> implements AutoCloseable, Runnable {
   private static Logger logger = LogManager.getLogger(BaseConsumer.class);
 
   public static Properties getProperties(String groupId) {
     Properties properties = new Properties();
     // properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+    properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, Util.getBootstrapServer());
     properties.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 60_000);
     properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
     properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -85,6 +91,7 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable {
   private AtomicBoolean resume = new AtomicBoolean(false);
   protected Collection<String> topicNames;
   protected Pattern topicPattern;
+  private long errorCount = 0;
 
   public BaseConsumer(String groupId) {
     this.groupId = groupId;
@@ -276,6 +283,55 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable {
     if (resubscribe.compareAndSet(true, false)) {
       subscribe();
     }
+  }
+
+  @Override
+  public final void run() {
+    if (consumer != null) {
+      throw CloudIOException.with("{}: Consumer already running!", getName());
+    }
+    ThreadContext.put("instanceIdentifier", "[" + Util.getInsatnceIdentifier() + "]");
+    logger.info("{}: Starting Consumer...", getName());
+
+    try {
+      consumer = createConsumer();
+      subscribe();
+      while (canRun()) {
+        try {
+          checkRestart();
+
+          checkResubscribe();
+
+          checkPauseOrResume(); // this is throwing WakeupException when trying to commit the offsets before
+                               // resume
+
+          poll();
+          errorCount = 0;
+        } catch (WakeupException | InterruptException e) {
+          // logger.warn("{} wokeup/interrupted...", getName());
+        } catch (Throwable e) {
+          errorCount++;
+          logger.catching(e);
+          if (errorCount > 10) {
+            logger.error("Consumer", getName(), "Too many errors! Closing consumer " + getName());
+            throw e;
+          }
+        }
+      }
+      if (consumer != null) {
+        // commit any pending commits in toBeCommitted
+        Set<TopicPartition> assignments = consumer.assignment();
+        doCommitBeforeNextPoll(assignments);
+      }
+    } catch (Throwable e) {
+      logger.catching(e);
+    } finally {
+      logger.warn("Closing {} Consumer", getName());
+      Util.closeQuietly(consumer);
+      logger.warn("Closed {} Consumer", getName());
+
+    }
+
   }
 
   public static final void closeQuietly(AutoCloseable autoClosable) {

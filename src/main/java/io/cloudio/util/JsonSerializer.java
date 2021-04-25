@@ -52,7 +52,6 @@ public class JsonSerializer<T> implements Serializer<T> {
 
   public static final GsonBuilder setupGsonBuilder() {
     GsonBuilder gsonb = setupGsonBuilderSkipNulls();
-    gsonb.serializeNulls();
     return gsonb;
   }
 
