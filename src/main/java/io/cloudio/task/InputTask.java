@@ -13,7 +13,7 @@ import io.cloudio.messages.TaskStartResponse;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.Util;
 
-public abstract class InputTask extends BaseTask {
+public abstract class InputTask<K, V> extends BaseTask<K, V> {
 
   protected AtomicBoolean isLeader = new AtomicBoolean(false);
 

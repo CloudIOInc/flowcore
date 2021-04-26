@@ -16,6 +16,7 @@ public class TaskStartResponse {
   private List<Map<String, Integer>> fromTopicStartOffsets;
   private String toTopic;
   private String wfInstUid;
+  private String taskType;
   private String wfUid;
 
   public int getExecutionId() {
@@ -104,6 +105,14 @@ public class TaskStartResponse {
 
   public void setOrgUid(String orgUid) {
     this.orgUid = orgUid;
+  }
+
+  public String getTaskType() {
+    return taskType;
+  }
+
+  public void setTaskType(String taskType) {
+    this.taskType = taskType;
   }
 
   /*

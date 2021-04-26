@@ -2,21 +2,40 @@
 package io.cloudio.consumer;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+import io.cloudio.task.BaseTask;
 import io.cloudio.task.Data;
 import io.cloudio.util.JsonDeserializer;
 
-public class DataConsumer extends BaseConsumer<String, Data> {
+public class DataConsumer extends Consumer<String, Data> {
+  private CountDownLatch countDownLatch = new CountDownLatch(1);
+  private static Logger logger = LogManager.getLogger(BaseConsumer.class);
+  final Duration initialDuration = Duration.ofSeconds(1);
+  Duration duration = initialDuration;
+  BaseTask<String, Data> baseTask;
+  TopicPartition partition = null;
+  Integer offset = null;
 
-  public DataConsumer(String groupId, Collection<String> topicNames) {
+  public DataConsumer(String groupId, Collection<String> topicNames, BaseTask<String, Data> baseTask,
+      TopicPartition partition, Integer offset) {
     super(groupId, topicNames);
+    this.baseTask = baseTask;
+    this.partition = partition;
+    this.offset = offset;
   }
 
   @Override
@@ -32,15 +51,101 @@ public class DataConsumer extends BaseConsumer<String, Data> {
     return topicNames.toString();
   }
 
-  @Override
-  public ConsumerRecords<String, Data> poll() throws Throwable {
-    ConsumerRecords<String, Data> records = consumer.poll(Duration.ofSeconds(10));
-    return records;
-
-  }
-
   public Properties getProperties() {
     return properties;
   }
 
+  public void error(Throwable e) {
+    close();
+    onError(e);
+    countDownLatch.countDown();
+  }
+
+  protected void onError(Throwable e) {
+    logger.catching(e);
+  }
+
+  public final void complete() {
+    close();
+    countDownLatch.countDown();
+  }
+
+  public void await() throws InterruptedException {
+    countDownLatch.await();
+  }
+
+  @Override
+  public void subscribe() {
+    if (partition != null && offset > -1) {
+      consumer.assign(Arrays.asList(partition));
+      consumer.seek(partition, offset);
+    } else {
+      super.subscribe();
+    }
+
+  }
+
+  @Override
+  public void handleEvents(TopicPartition topicPartition, List<ConsumerRecord<String, Data>> records) throws Throwable {
+    for (ConsumerRecord<String, Data> m : records) {
+      if (isClosing()) {
+        return;
+      }
+      List<Data> list = new ArrayList<>(records.size());
+      for (ConsumerRecord<String, Data> record : records) {
+        Data data = record.value();
+        if (data == null) {
+          continue;
+        }
+        list.add(data);
+      }
+      this.baseTask.handleData(list);
+    }
+  }
+  //
+  //  @Override
+  //  public void poll() throws Exception {
+  //    if (isClosing()) {
+  //      return;
+  //    }
+  //    ConsumerRecords<String, Data> records = consumer.poll(duration);
+  //    if (records.count() == 0) {
+  //      emptyCounter++;
+  //      if (emptyCounter > 10) {
+  //        error(CloudIOException.with(
+  //            "Got empty records for 10 polls before reaching the end offset {}!"));
+  //      }
+  //      if (duration.getSeconds() < 600) {
+  //        duration = duration.plusSeconds(duration.getSeconds());
+  //      }
+  //      if (duration.getSeconds() > 600) {
+  //        duration = Duration.ofSeconds(600);
+  //      }
+  //      updateProgress(emptyCounter, duration.getSeconds());
+  //      return;
+  //    } else {
+  //      emptyCounter = 0;
+  //      duration = initialDuration;
+  //      List<Data> list = new ArrayList<>(records.count());
+  //      for (ConsumerRecord<String, Data> record : records) {
+  //        Data data = record.value();
+  //        if (data == null) {
+  //          continue;
+  //        }
+  //        list.add(data);
+  //      }
+  //      this.baseTask.handleData(list);
+  //
+  //    }
+  //  }
+
+  public void seek(TopicPartition tp, long offset) {
+    consumer.seek(tp, offset);
+  }
+
+  protected void updateProgress(int emptyCounter, long seconds) {
+    if (logger.isDebugEnabled()) {
+      logger.debug("Got empty rows for {} polls. Will try again in {} seconds!", emptyCounter, seconds);
+    }
+  }
 }

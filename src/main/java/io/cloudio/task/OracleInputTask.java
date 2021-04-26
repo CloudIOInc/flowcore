@@ -42,7 +42,10 @@ public abstract class OracleInputTask extends InputTask {
     try {
       producer = Producer.get();
       producer.beginTransaction();
-      sendTaskStartResponse(taskRequest, groupId);
+      if (!isSendStartResonse()) {
+        sendTaskStartResponse(taskRequest, groupId);
+        setSendStartResonse(true);
+      }
       executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
           taskRequest.getInputState());
       producer.commitTransaction();
@@ -54,6 +57,10 @@ public abstract class OracleInputTask extends InputTask {
     } finally {
       Util.closeQuietly(producer);
       sendTaskEndResponse(taskRequest, isError);
+      if (!isError) {
+        sendEndMessage();
+      }
+      setSendStartResonse(false);
     }
   }
 
@@ -101,6 +108,11 @@ public abstract class OracleInputTask extends InputTask {
     return null;
     // invoke rest api to get the data
     // string -> V
+  }
+
+  @Override
+  public void handleData(List data) throws Exception {
+
   }
 
 }

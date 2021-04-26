@@ -12,7 +12,7 @@ import org.apache.logging.log4j.Logger;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.Util;
 
-public abstract class OracleOutputTask extends OutputTask {
+public abstract class OracleOutputTask<K, V> extends OutputTask<K, V> {
   Util readerUtil = new Util();
   private static Logger logger = LogManager.getLogger(OracleOutputTask.class);
   public static final char QUOTE_CHAR = '"';
@@ -26,22 +26,35 @@ public abstract class OracleOutputTask extends OutputTask {
   public abstract void executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
       Map<String, Object> inputState, List<Data> dataList) throws Exception;
 
-  public void handleData(List<Data> data) throws Exception {
+  public void handleData(List<Data> dataList) throws Exception {
     boolean isError = false;
+    Data endMessage = null;
     try {
-      producer = Producer.get();
-      producer.beginTransaction();
-      executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
-          taskRequest.getInputState(), data);
-      producer.commitTransaction();
+      int lastIndex = dataList.size() - 1;
+      endMessage = dataList.get(lastIndex);
+      if (endMessage.isEnd()) {
+        unsubscribeData();
+        dataConsumer.complete();
+        dataList.remove(lastIndex);
+      }
+      if (dataList.size() > 0) {
+        producer = Producer.get();
+        producer.beginTransaction();
+        executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
+            taskRequest.getInputState(), dataList);
+        producer.commitTransaction();
+      }
     } catch (Exception e) {
       logger.catching(e);
+      dataConsumer.complete();
       producer.abortTransactionQuietly();
       isError = false;
       throw e;
     } finally {
       Util.closeQuietly(producer);
-      sendTaskEndResponse(taskRequest, isError);
+      if (endMessage != null) {
+        sendTaskEndResponse(taskRequest, isError);
+      }
     }
   }
 
@@ -53,7 +66,7 @@ public abstract class OracleOutputTask extends OutputTask {
         .append("(");
     getSchema(tableName).forEach(field -> {
       logger.info(field);
-      sb.append(field.get("fieldName")).append(",");
+      sb.append((String) ((Map<String, Object>) field).get("fieldName")).append(",");
       placeHolder.append("?,");
     });
 

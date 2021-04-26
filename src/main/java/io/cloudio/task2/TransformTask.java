@@ -40,7 +40,7 @@ public abstract class TransformTask extends BaseTask {
   }
 
   public abstract Map<String, Object> executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
-      Map<String, Object> inputState, Data data) throws Exception;
+      Map<String, Object> inputState, DataWW data) throws Exception;
 
   protected void unsubscribeData() {
     dataConsumer.close();
@@ -49,7 +49,7 @@ public abstract class TransformTask extends BaseTask {
   private void subscribeData(String fromTopic) {
     Throwable ex = null;
     if (dataConsumer == null) {
-      dataConsumer = new DataConsumer(groupId + "-Data", Collections.singleton(fromTopic));
+      dataConsumer = null;//new DataConsumer(groupId + "-Data", Collections.singleton(fromTopic));
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
     }
@@ -57,13 +57,13 @@ public abstract class TransformTask extends BaseTask {
       try {
         if (dataConsumer.canRun()) {
           logger.debug("eventConsumer poll() calling");
-          ConsumerRecords<String, Data> dataRecords = null;//dataConsumer.poll();
+          ConsumerRecords<String, DataWW> dataRecords = null;//dataConsumer.poll();
           if (dataRecords.count() > 0) {
             if (!consumeData.get()) {
               consumeData.compareAndSet(false, true);
             }
             for (TopicPartition partition : dataRecords.partitions()) {
-              List<ConsumerRecord<String, Data>> partitionRecords = dataRecords.records(partition);
+              List<ConsumerRecord<String, DataWW>> partitionRecords = dataRecords.records(partition);
               if (partitionRecords.size() == 0) {
                 continue;
               }
@@ -73,9 +73,9 @@ public abstract class TransformTask extends BaseTask {
                     partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
               }
 
-              List<Data> list = new ArrayList<>(partitionRecords.size());
-              for (ConsumerRecord<String, Data> record : partitionRecords) {
-                Data data = record.value();
+              List<DataWW> list = new ArrayList<>(partitionRecords.size());
+              for (ConsumerRecord<String, DataWW> record : partitionRecords) {
+                DataWW data = record.value();
                 list.add(data);
               }
               try {
@@ -121,9 +121,9 @@ public abstract class TransformTask extends BaseTask {
     }
   }
 
-  public void handleData(List<Data> dataList) throws Exception {
+  public void handleData(List<DataWW> dataList) throws Exception {
     boolean isError = false;
-    Data endMessage = null;
+    DataWW endMessage = null;
     try {
       int lastIndex = dataList.size() - 1;
       endMessage = dataList.get(lastIndex);
@@ -133,7 +133,7 @@ public abstract class TransformTask extends BaseTask {
       }
       if (dataList.size() > 0) {
         producer = Producer.get();
-        for (Data data : dataList) {
+        for (DataWW data : dataList) {
           producer.beginTransaction();
           executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
               taskRequest.getInputState(), data);
@@ -157,7 +157,7 @@ public abstract class TransformTask extends BaseTask {
     Util.createTopic(Util.getAdminClient(bootStrapServer), eventTopic, partitions);
   }
 
-  public void post(Data data) throws Exception {
+  public void post(DataWW data) throws Exception {
     producer.send(taskRequest.getToTopic(), data);
   }
 

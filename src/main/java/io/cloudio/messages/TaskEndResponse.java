@@ -7,7 +7,7 @@ import java.util.Map;
 public class TaskEndResponse {
   private int executionId;
   private String endDate;
-  private Map<String, String> outCome;
+  private Map<String, String> outcome;
   private Map<String, Object> output;
   private String nodeUid;
   private String startDate;
@@ -117,12 +117,12 @@ public class TaskEndResponse {
     this.endDate = endDate;
   }
 
-  public Map<String, String> getOutCome() {
-    return outCome;
+  public Map<String, String> getOutcome() {
+    return outcome;
   }
 
-  public void setOutCome(Map<String, String> outCome) {
-    this.outCome = outCome;
+  public void setOutcome(Map<String, String> outCome) {
+    this.outcome = outCome;
   }
 
   public Map<String, Object> getOutput() {

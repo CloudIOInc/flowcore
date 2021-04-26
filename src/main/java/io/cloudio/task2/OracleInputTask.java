@@ -57,12 +57,12 @@ public abstract class OracleInputTask extends InputTask {
     }
   }
 
-  public void post(Data data) throws Exception {
+  public void post(DataWW data) throws Exception {
     producer.send(taskRequest.getToTopic(), data);
   }
 
-  protected Data populateData(ResultSet rs, String tableName) throws Exception {
-    Data d = new Data();
+  protected DataWW populateData(ResultSet rs, String tableName) throws Exception {
+    DataWW d = new DataWW();
     List<HashMap<String, Object>> schema = getSchema(tableName);
     for (int i = 0; i < schema.size(); i++) {
       Map<String, Object> field = schema.get(i);

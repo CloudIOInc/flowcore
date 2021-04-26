@@ -26,11 +26,11 @@ public abstract class OutputTask extends BaseTask {
     super(taskCode);
   }
 
-  public abstract void handleData(List<Data> data) throws Exception;
+  public abstract void handleData(List<DataWW> data) throws Exception;
 
   public void handleEvent() {
     if (dataConsumer == null) {
-      dataConsumer = new DataConsumer(groupId + "n3", Collections.singleton(taskRequest.getFromTopic()));
+      dataConsumer = null;// new DataConsumer(groupId + "n3", Collections.singleton(taskRequest.getFromTopic()));
       dataConsumer.createConsumer();
       dataConsumer.subscribe();
       executorService.execute(() -> subscribeData(taskRequest.getFromTopic()));
@@ -45,10 +45,10 @@ public abstract class OutputTask extends BaseTask {
     while (true) {
       if (dataConsumer.canRun()) {
         try {
-          ConsumerRecords<String, Data> dataRecords = null;//dataConsumer.poll();
+          ConsumerRecords<String, DataWW> dataRecords = null;//dataConsumer.poll();
           if (dataRecords.count() > 0) {
             for (TopicPartition partition : dataRecords.partitions()) {
-              List<ConsumerRecord<String, Data>> partitionRecords = dataRecords.records(partition);
+              List<ConsumerRecord<String, DataWW>> partitionRecords = dataRecords.records(partition);
               if (partitionRecords.size() == 0) {
                 continue;
               }
@@ -57,9 +57,9 @@ public abstract class OutputTask extends BaseTask {
                     partitionRecords.get(0).offset(),
                     partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
               }
-              List<Data> list = new ArrayList<>(partitionRecords.size());
-              for (ConsumerRecord<String, Data> record : partitionRecords) {
-                Data data = record.value();
+              List<DataWW> list = new ArrayList<>(partitionRecords.size());
+              for (ConsumerRecord<String, DataWW> record : partitionRecords) {
+                DataWW data = record.value();
                 if (data == null) {
                   continue;
                 }
@@ -86,7 +86,7 @@ public abstract class OutputTask extends BaseTask {
   }
 
   private Throwable commitDataConsumer(Throwable ex, TopicPartition partition,
-      List<ConsumerRecord<String, Data>> partitionRecords, List<Data> list) {
+      List<ConsumerRecord<String, DataWW>> partitionRecords, List<DataWW> list) {
     try {
       if (partitionRecords.size() > 0) {
         long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();

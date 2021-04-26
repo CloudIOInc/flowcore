@@ -1,18 +1,12 @@
 
 package io.cloudio.task;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.InterruptException;
-import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -22,7 +16,7 @@ import io.cloudio.messages.TaskStartResponse;
 import io.cloudio.producer.Producer;
 import io.cloudio.util.Util;
 
-public abstract class TransformTask extends BaseTask {
+public abstract class TransformTask<K, V> extends BaseTask<K, V> {
 
   private DataConsumer dataConsumer;
   private Producer producer;
@@ -33,9 +27,8 @@ public abstract class TransformTask extends BaseTask {
     super(taskCode);
   }
 
-  public void handleEvent() throws Exception { // new event from wf engine
-    unsubscribeEvent();
-    sendTaskStartResponse(taskRequest, groupId);
+  public void handleEvent() throws Exception {
+    //unsubscribeEvent();
     subscribeData(taskRequest.getFromTopic());
   }
 
@@ -46,79 +39,18 @@ public abstract class TransformTask extends BaseTask {
     dataConsumer.close();
   }
 
-  private void subscribeData(String fromTopic) {
-    Throwable ex = null;
-    if (dataConsumer == null) {
-      dataConsumer = new DataConsumer(groupId + "-Data", Collections.singleton(fromTopic));
-      dataConsumer.createConsumer();
-      dataConsumer.subscribe();
-    }
-    while (true) {
-      try {
-        if (dataConsumer.canRun()) {
-          logger.debug("eventConsumer poll() calling");
-          ConsumerRecords<String, Data> dataRecords = dataConsumer.poll();
-          if (dataRecords.count() > 0) {
-            if (!consumeData.get()) {
-              consumeData.compareAndSet(false, true);
-            }
-            for (TopicPartition partition : dataRecords.partitions()) {
-              List<ConsumerRecord<String, Data>> partitionRecords = dataRecords.records(partition);
-              if (partitionRecords.size() == 0) {
-                continue;
-              }
-              if (logger.isInfoEnabled()) {
-                logger.info("DataConsumer : Got {} events between {} & {} in {}", partitionRecords.size(),
-                    partitionRecords.get(0).offset(),
-                    partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
-              }
-
-              List<Data> list = new ArrayList<>(partitionRecords.size());
-              for (ConsumerRecord<String, Data> record : partitionRecords) {
-                Data data = record.value();
-                list.add(data);
-              }
-              try {
-                if (list.size() > 0) {
-                  this.handleData(list);
-                }
-
-                if (partitionRecords.size() > 0) {
-                  long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-                  dataConsumer.commitSync(
-                      Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
-                }
-              } catch (WakeupException | InterruptException e) {
-                throw e;
-              } catch (Throwable e) {
-                logger.catching(e);
-                if (ex == null) {
-                  ex = e;
-                }
-                try {
-                  logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
-                      partitionRecords.get(0).offset(),
-                      partitionRecords.get(partitionRecords.size() - 1).offset(),
-                      partition.toString());
-
-                  dataConsumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
-                } catch (Throwable e1) {
-                  dataConsumer.restartBeforeNextPoll();
-                }
-              }
-            }
-            if (ex != null) {
-              throw ex;
-            }
-          }
-        } else {
-          Thread.sleep(10 * 10000); //sleep for 10 seconds
-        }
-      } catch (Throwable e) {
-        logger.catching(e);
-      }
-
-    }
+  private void subscribeData(String fromTopic) throws Exception {
+    String _id = "dt_consumer_" + taskRequest.getFromTopic() + "_uuid";
+    List<Map<String, Integer>> offsets = taskRequest.getFromTopicStartOffsets();
+    Integer partition = offsets.get(0).get("partition");
+    Integer offset = offsets.get(0).get("offset");
+    TopicPartition part = new TopicPartition(fromTopic, partition);
+    dataConsumer = new DataConsumer(_id,
+        Collections.singleton(taskRequest.getFromTopic()), (BaseTask<String, Data>) this, part, offset);
+    dataConsumer.run();
+    // dataConsumer.seek(part, offset);
+    dataConsumer.await();
+    logger.info("Subscribing data event for transform task  - {}", _id);
   }
 
   public void handleData(List<Data> dataList) throws Exception {
@@ -129,7 +61,12 @@ public abstract class TransformTask extends BaseTask {
       endMessage = dataList.get(lastIndex);
       if (endMessage.isEnd()) {
         unsubscribeData();
+        dataConsumer.complete();
         dataList.remove(lastIndex);
+      }
+      if (!isSendStartResonse()) {
+        sendTaskStartResponse(taskRequest, groupId);
+        setSendStartResonse(true);
       }
       if (dataList.size() > 0) {
         producer = Producer.get();
@@ -144,12 +81,18 @@ public abstract class TransformTask extends BaseTask {
     } catch (Exception e) {
       producer.abortTransactionQuietly();
       logger.catching(e);
+      dataConsumer.complete();
+      isError = true;
       throw e;
     } finally {
       Util.closeQuietly(producer);
       if (endMessage != null) {
         sendTaskEndResponse(taskRequest, isError);
+        if (!isError) {
+          sendEndMessage();
+        }
       }
+      setSendStartResonse(false);
     }
   }
 
@@ -199,7 +142,7 @@ public abstract class TransformTask extends BaseTask {
     response.setWfInstUid(taskRequest.getWfInstUid());
     response.setWfUid(taskRequest.getWfUid());
 
-    logger.info("Sending Transform end response  for - {}-{} ", taskRequest.getNodeType(),
+    logger.info("Sending Transform start response  for - {}-{} ", taskRequest.getNodeType(),
         taskRequest.getWfInstUid());
   }
 

@@ -2,7 +2,6 @@
 package io.cloudio.task;
 
 import java.lang.reflect.Type;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -14,27 +13,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.InterruptException;
-import org.apache.kafka.common.errors.WakeupException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 
-import io.cloudio.consumer.TaskConsumer;
+import io.cloudio.consumer.SinglePartitionEventConsumer;
 import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
 import io.cloudio.task.Data.EventType;
 import io.cloudio.util.Util;
 
-public abstract class BaseTask {
+public abstract class BaseTask<K, V> {
   public static final String WF_EVENTS_TOPIC = "wf_events";
   private static Logger logger = LogManager.getLogger(BaseTask.class);
   protected static Map<String, Object> DUMMY_MAP = new HashMap<String, Object>();
@@ -47,8 +41,9 @@ public abstract class BaseTask {
   protected TaskRequest taskRequest;
   protected String taskCode;
   protected String eventTopic;
-  protected TaskConsumer taskConsumer;
+  protected SinglePartitionEventConsumer<String, String> taskConsumer;
   protected String groupId;
+  private boolean isSendStartResponse;
 
   public BaseTask(String taskCode) {
     this.taskCode = taskCode;
@@ -58,61 +53,30 @@ public abstract class BaseTask {
   }
 
   public void start() throws Exception {
-    taskConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
-    taskConsumer.getProperties().put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
-    // taskConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
-    taskConsumer.createConsumer();
-    taskConsumer.subscribe();
-    subscribeEvent(eventTopic);
+    subscribeEvent();
   }
 
   public abstract void handleEvent() throws Throwable;
 
-  void subscribeEvent(String eventTopic) {
-    Throwable ex = null;
+  public abstract void handleData(List<Data> data) throws Exception;
 
-    try {
-      while (true) {
-        if (taskConsumer.canRun()) {
-          ConsumerRecords<String, String> events = taskConsumer.poll();
-          if (events != null && events.count() > 0) {
-            for (TopicPartition partition : events.partitions()) {
-              List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
-              if (partitionRecords.size() == 0) {
-                continue;
-              }
-              if (logger.isInfoEnabled()) {
-                logger.info("Got {} task events between {} & {} in {}", partitionRecords.size(),
-                    partitionRecords.get(0).offset(),
-                    partitionRecords.get(partitionRecords.size() - 1).offset(), partition.toString());
-              }
+  void subscribeEvent() {
 
-              for (ConsumerRecord<String, String> record : partitionRecords) {
-                String eventSting = record.value();
-                if (eventSting == null) {
-                  continue;
-                }
-                TaskRequest taskRequest = getTaskRequest(eventSting);
-                this.taskRequest = taskRequest;
-                handleEvent();
-              }
-              ex = commitAndHandleErrors(taskConsumer, partition, partitionRecords);
-            }
-            if (ex != null) {
-              throw ex;
-            }
-          }
-        } else {
-          Thread.sleep(10 * 1000); //sleep for 10 seconds
-        }
+    taskConsumer = new SinglePartitionEventConsumer<String, String>(this.groupId, new TopicPartition(eventTopic, 0),
+        (BaseTask<String, String>) this) {
+
+      @Override
+      public void handleEvent(TopicPartition topicPartition, ConsumerRecord<String, String> message)
+          throws Throwable {
+        String eventString = message.value();
+        task.taskRequest = getTaskRequest(eventString);
+        task.handleEvent();
       }
 
-    } catch (
+    };
 
-    Throwable e) {
-      logger.catching(e);
-    }
-    logger.debug("Stopped event consumer for {} task ", taskCode);
+    executorService
+        .execute(taskConsumer);
   }
 
   static Gson gson = new Gson();
@@ -153,7 +117,7 @@ public abstract class BaseTask {
     } else {
       outCome.put("status", "Success");
     }
-    response.setOutCome(outCome);
+    response.setOutcome(outCome);
     response.setOutput(new HashMap<String, Object>());
     response.setStartDate(taskRequest.getStartDate());
     response.setWfInstUid(taskRequest.getWfInstUid());
@@ -167,39 +131,6 @@ public abstract class BaseTask {
     }
     logger.info("Sending task end response  for - {}-{}-{} ", taskRequest.getNodeType(), taskRequest.getTaskType(),
         taskRequest.getWfInstUid());
-  }
-
-  protected Throwable commitAndHandleErrors(TaskConsumer consumer, TopicPartition partition,
-      List<ConsumerRecord<String, String>> partitionRecords) {
-    Throwable ex = null;
-    try {
-
-      if (partitionRecords.size() > 0) {
-        long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
-        consumer.commitSync(
-            Collections.singletonMap(partition, new OffsetAndMetadata(lastOffset + 1)));
-        logger.info("commiting offset - {}, partition - {}", lastOffset, partition);
-      }
-    } catch (WakeupException | InterruptException e) {
-      //throw e;
-    } catch (Throwable e) {
-      logger.catching(e);
-      if (ex == null) {
-        ex = e;
-      }
-      try {
-        logger.error("Seeking back {} events between {} & {} in {}", partitionRecords.size(),
-            partitionRecords.get(0).offset(),
-            partitionRecords.get(partitionRecords.size() - 1).offset(),
-            partition.toString());
-
-        consumer.getConsumer().seek(partition, partitionRecords.get(0).offset());
-      } catch (Throwable e1) {
-        logger.error(e1);
-        consumer.restartBeforeNextPoll();
-      }
-    }
-    return ex;
   }
 
   protected List<HashMap<String, Object>> getSchema(String tableName) throws Exception {
@@ -243,7 +174,7 @@ public abstract class BaseTask {
     });
   }
 
-  protected void sendEndMessage(TaskRequest taskRequest, String groupId) throws Exception {
+  protected void sendEndMessage() throws Exception {
     Data endMessage = new Data();
     endMessage.setEnd(EventType.End);
     List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, Util.getBootstrapServer(),
@@ -258,6 +189,14 @@ public abstract class BaseTask {
       p.commitTransaction();
       logger.info("Sending end data message for - {}", taskRequest.getToTopic());
     }
+  }
+
+  public boolean isSendStartResonse() {
+    return isSendStartResponse;
+  }
+
+  public void setSendStartResonse(boolean isSendResonse) {
+    this.isSendStartResponse = isSendResonse;
   }
 
 }

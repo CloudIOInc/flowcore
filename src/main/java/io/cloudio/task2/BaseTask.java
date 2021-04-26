@@ -27,11 +27,11 @@ import org.apache.logging.log4j.Logger;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 
-import io.cloudio.consumer.TaskConsumer;
+import io.cloudio.consumer.Consumer;
 import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
-import io.cloudio.task2.Data.EventType;
+import io.cloudio.task2.DataWW.EventType;
 import io.cloudio.util.Util;
 
 public abstract class BaseTask {
@@ -47,7 +47,7 @@ public abstract class BaseTask {
   protected TaskRequest taskRequest;
   protected String taskCode;
   protected String eventTopic;
-  protected TaskConsumer taskConsumer;
+  protected Consumer taskConsumer;
   protected String groupId;
 
   public BaseTask(String taskCode) {
@@ -58,7 +58,7 @@ public abstract class BaseTask {
   }
 
   public void start() throws Exception {
-    taskConsumer = new TaskConsumer(groupId, Collections.singleton(eventTopic));
+    taskConsumer = new Consumer(groupId, Collections.singleton(eventTopic));
     taskConsumer.getProperties().put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
     // taskConsumer.getProperties().put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootStrapServer);
     taskConsumer.createConsumer();
@@ -74,7 +74,7 @@ public abstract class BaseTask {
     try {
       while (true) {
         if (taskConsumer.canRun()) {
-          ConsumerRecords<String, String> events = taskConsumer.poll();
+          ConsumerRecords<String, String> events = null; //taskConsumer.poll();
           if (events != null && events.count() > 0) {
             for (TopicPartition partition : events.partitions()) {
               List<ConsumerRecord<String, String>> partitionRecords = events.records(partition);
@@ -153,7 +153,7 @@ public abstract class BaseTask {
     } else {
       outCome.put("status", "Success");
     }
-    response.setOutCome(outCome);
+    response.setOutcome(outCome);
     response.setOutput(new HashMap<String, Object>());
     response.setStartDate(taskRequest.getStartDate());
     response.setWfInstUid(taskRequest.getWfInstUid());
@@ -169,7 +169,7 @@ public abstract class BaseTask {
         taskRequest.getWfInstUid());
   }
 
-  protected Throwable commitAndHandleErrors(TaskConsumer consumer, TopicPartition partition,
+  protected Throwable commitAndHandleErrors(Consumer consumer, TopicPartition partition,
       List<ConsumerRecord<String, String>> partitionRecords) {
     Throwable ex = null;
     try {
@@ -244,7 +244,7 @@ public abstract class BaseTask {
   }
 
   protected void sendEndMessage(TaskRequest taskRequest, String groupId) throws Exception {
-    Data endMessage = new Data();
+    DataWW endMessage = new DataWW();
     endMessage.setEnd(EventType.End);
     List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, Util.getBootstrapServer(),
         false);

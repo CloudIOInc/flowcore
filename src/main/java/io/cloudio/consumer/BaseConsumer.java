@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.CooperativeStickyAssignor;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -50,7 +49,6 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable, Runnable {
 
   public static Properties getProperties(String groupId) {
     Properties properties = new Properties();
-    // properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
     properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, Util.getBootstrapServer());
     properties.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 60_000);
     properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -411,7 +409,7 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable, Runnable {
     }
   }
 
-  protected abstract ConsumerRecords<K, V> poll() throws Throwable;
+  protected abstract void poll() throws Throwable;
 
   public void restartBeforeNextPoll() {
     restart.set(true);
