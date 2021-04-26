@@ -88,6 +88,7 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
         if (!isError) {
           sendEndMessage();
         }
+        setSendStartResonse(false);
       }
 
     }

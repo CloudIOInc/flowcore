@@ -87,20 +87,19 @@ public class DataConsumer extends Consumer<String, Data> {
 
   @Override
   public void handleEvents(TopicPartition topicPartition, List<ConsumerRecord<String, Data>> records) throws Throwable {
-    for (ConsumerRecord<String, Data> m : records) {
-      if (isClosing()) {
-        return;
-      }
-      List<Data> list = new ArrayList<>(records.size());
-      for (ConsumerRecord<String, Data> record : records) {
-        Data data = record.value();
-        if (data == null) {
-          continue;
-        }
-        list.add(data);
-      }
-      this.baseTask.handleData(list);
+
+    if (isClosing()) {
+      return;
     }
+    List<Data> list = new ArrayList<>(records.size());
+    for (ConsumerRecord<String, Data> record : records) {
+      Data data = record.value();
+      if (data == null) {
+        continue;
+      }
+      list.add(data);
+    }
+    this.baseTask.handleData(list);
   }
   //
   //  @Override
