@@ -52,7 +52,7 @@ public abstract class OracleOutputTask<K, V> extends OutputTask<K, V> {
       throw e;
     } finally {
       Util.closeQuietly(producer);
-      if (endMessage != null) {
+      if (endMessage != null && endMessage.isEnd()) {
         sendTaskEndResponse(taskRequest, isError);
       }
     }

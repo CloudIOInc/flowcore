@@ -63,7 +63,7 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
 
   @Override
   public String getName() {
-    return "Single Partition Event";
+    return "Single Partition - " + partition.toString();
   }
 
   public void await() throws InterruptedException {

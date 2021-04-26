@@ -4,7 +4,6 @@ package io.cloudio.task;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.kafka.common.TopicPartition;
 import org.apache.logging.log4j.LogManager;
@@ -20,7 +19,6 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
 
   private DataConsumer dataConsumer;
   private Producer producer;
-  private AtomicBoolean consumeData = new AtomicBoolean(false);
   private static Logger logger = LogManager.getLogger(TransformTask.class);
 
   public TransformTask(String taskCode) {
@@ -28,7 +26,6 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
   }
 
   public void handleEvent() throws Exception {
-    //unsubscribeEvent();
     subscribeData(taskRequest.getFromTopic());
   }
 
@@ -40,7 +37,7 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
   }
 
   private void subscribeData(String fromTopic) throws Exception {
-    String _id = "dt_consumer_" + taskRequest.getFromTopic() + "_uuid";
+    String _id = "dt_consumer_transform_" + taskRequest.getFromTopic();
     List<Map<String, Integer>> offsets = taskRequest.getFromTopicStartOffsets();
     Integer partition = offsets.get(0).get("partition");
     Integer offset = offsets.get(0).get("offset");
@@ -48,7 +45,6 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
     dataConsumer = new DataConsumer(_id,
         Collections.singleton(taskRequest.getFromTopic()), (BaseTask<String, Data>) this, part, offset);
     dataConsumer.run();
-    // dataConsumer.seek(part, offset);
     dataConsumer.await();
     logger.info("Subscribing data event for transform task  - {}", _id);
   }
@@ -65,6 +61,7 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
         dataList.remove(lastIndex);
       }
       if (!isSendStartResonse()) {
+        logger.info("SendResponseFlag - {}", isSendStartResonse());
         sendTaskStartResponse(taskRequest, groupId);
         setSendStartResonse(true);
       }
@@ -86,13 +83,13 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
       throw e;
     } finally {
       Util.closeQuietly(producer);
-      if (endMessage != null) {
+      if (endMessage != null && endMessage.isEnd()) {
         sendTaskEndResponse(taskRequest, isError);
         if (!isError) {
           sendEndMessage();
         }
       }
-      setSendStartResonse(false);
+
     }
   }
 
@@ -132,15 +129,16 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
     List<Map<String, Integer>> offsets = Util.getOffsets(taskRequest.getToTopic(), groupId, Util.getBootstrapServer(),
         false);
     response.setFromTopicStartOffsets(offsets);
+    response.setVersion(taskRequest.getVersion());
+    response.setToTopic(taskRequest.getToTopic());
+    response.setWfInstUid(taskRequest.getWfInstUid());
+    response.setWfUid(taskRequest.getWfUid());
+    response.setTaskType(taskRequest.getTaskType());
     try (Producer p = Producer.get()) {
       p.beginTransaction();
       p.send(WF_EVENTS_TOPIC, response);
       p.commitTransaction();
     }
-    response.setVersion(taskRequest.getVersion());
-    response.setToTopic(taskRequest.getToTopic());
-    response.setWfInstUid(taskRequest.getWfInstUid());
-    response.setWfUid(taskRequest.getWfUid());
 
     logger.info("Sending Transform start response  for - {}-{} ", taskRequest.getNodeType(),
         taskRequest.getWfInstUid());

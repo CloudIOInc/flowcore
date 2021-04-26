@@ -55,6 +55,7 @@ public abstract class InputTask<K, V> extends BaseTask<K, V> {
     response.setToTopic(taskRequest.getToTopic());
     response.setWfInstUid(taskRequest.getWfInstUid());
     response.setWfUid(taskRequest.getWfUid());
+    response.setTaskType(taskRequest.getTaskType());
 
     try (Producer p = Producer.get()) {
       p.beginTransaction();

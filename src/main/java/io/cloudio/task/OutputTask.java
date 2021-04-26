@@ -26,7 +26,7 @@ public abstract class OutputTask<K, V> extends BaseTask<K, V> {
   }
 
   private void subscribeData() throws Exception {
-    String _id = "dt_consumer_" + taskRequest.getFromTopic() + "_uuid";
+    String _id = "dt_consumer_output" + taskRequest.getFromTopic();
     List<Map<String, Integer>> offsets = taskRequest.getFromTopicStartOffsets();
     Integer partition = offsets.get(0).get("partition");
     Integer offset = offsets.get(0).get("offset");
