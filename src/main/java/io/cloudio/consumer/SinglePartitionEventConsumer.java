@@ -33,7 +33,6 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
   private static Logger logger = LogManager.getLogger(SinglePartitionEventConsumer.class);
   private CountDownLatch countDownLatch = new CountDownLatch(1);
   TopicPartition partition;
-  long counter = 0;
   protected BaseTask<K, V> task;
   private static final AtomicInteger CONSUMER_CLIENT_ID_SEQUENCE = new AtomicInteger(1);
   final Duration initialDuration = Duration.ofSeconds(1);
@@ -73,7 +72,6 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
     if (isClosing()) {
       return;
     }
-    counter++;
     ConsumerRecords<K, V> records = consumer.poll(duration);
     if (records.count() == 0) {
       emptyCounter++;

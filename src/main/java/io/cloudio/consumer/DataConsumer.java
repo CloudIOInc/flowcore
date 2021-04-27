@@ -106,9 +106,4 @@ public class DataConsumer extends Consumer<String, Data> {
     consumer.seek(tp, offset);
   }
 
-  protected void updateProgress(int emptyCounter, long seconds) {
-    if (logger.isDebugEnabled()) {
-      logger.debug("Got empty rows for {} polls. Will try again in {} seconds!", emptyCounter, seconds);
-    }
-  }
 }

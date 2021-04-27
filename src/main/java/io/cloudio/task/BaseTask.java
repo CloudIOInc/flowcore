@@ -62,10 +62,6 @@ public abstract class BaseTask<K, V> {
 
   public abstract void handleEvent() throws Throwable;
 
-  public void handleData(List<Data> data) throws Exception {
-
-  }
-
   void subscribeEvent() {
 
     taskConsumer = new SinglePartitionEventConsumer<String, String>(this.groupId, new TopicPartition(eventTopic, 0),
@@ -267,6 +263,10 @@ public abstract class BaseTask<K, V> {
   private <V> V handlePostValue(HttpResponse<JsonNode> response) {
     handlePostError(response);
     return (V) response.getBody().getObject().get("value");
+  }
+
+  public void handleData(List<Data> data) throws Exception {
+
   }
 
 }

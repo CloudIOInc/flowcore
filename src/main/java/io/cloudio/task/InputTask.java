@@ -18,12 +18,45 @@ public abstract class InputTask<K, V> extends BaseTask<K, V> {
   protected AtomicBoolean isLeader = new AtomicBoolean(false);
 
   private static Logger logger = LogManager.getLogger(InputTask.class);
+  private Producer producer;
 
   InputTask(String taskCode) {
     super(taskCode);
   }
 
-  public abstract void handleData(TaskRequest event) throws Exception;
+  public abstract Map<String, Object> executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
+      Map<String, Object> inputState) throws Exception;
+
+  public void handleData(TaskRequest taskRequest) throws Exception {
+    boolean isError = false;
+    try {
+      producer = Producer.get();
+      producer.beginTransaction();
+      if (!isSendStartResonse()) {
+        sendTaskStartResponse(taskRequest, groupId);
+        setSendStartResonse(true);
+      }
+      executeTask(taskRequest.getInputParams(), taskRequest.getOutputParams(),
+          taskRequest.getInputState());
+      producer.commitTransaction();
+    } catch (Exception e) {
+      logger.catching(e);
+      producer.abortTransactionQuietly();
+      isError = false;
+      throw e;
+    } finally {
+      Util.closeQuietly(producer);
+      sendTaskEndResponse(taskRequest, isError);
+      if (!isError) {
+        sendEndMessage();
+      }
+      setSendStartResonse(false);
+    }
+  }
+
+  public void post(Data data) throws Exception {
+    producer.send(taskRequest.getToTopic(), data);
+  }
 
   protected void createTopic(String eventTopic, int partitions) throws Exception {
     Util.createTopic(Util.getAdminClient(Util.getBootstrapServer()), eventTopic, partitions);
@@ -67,4 +100,15 @@ public abstract class InputTask<K, V> extends BaseTask<K, V> {
         taskRequest.getWfInstUid());
   }
 
+  //  protected Data populateData(ResultSet rs, String tableName) throws Exception {
+  //    Data d = new Data();
+  //    List<HashMap<String, Object>> schema = getSchema(tableName);
+  //    for (int i = 0; i < schema.size(); i++) {
+  //      Map<String, Object> field = schema.get(i);
+  //      String fieldName = (String) field.get("fieldName");
+  //      Object obj = rs.getObject(fieldName);
+  //      d.put(fieldName, obj);
+  //    }
+  //    return d;
+  //  }
 }
