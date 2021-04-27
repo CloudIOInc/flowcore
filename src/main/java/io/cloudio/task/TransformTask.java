@@ -102,22 +102,6 @@ public abstract class TransformTask<K, V> extends BaseTask<K, V> {
     producer.send(taskRequest.getToTopic(), data);
   }
 
-  /*
-  // transform
-  {
-    "appUid": "cloudio",
-    "executionId": 1,
-    "fromTopic": "data_1",
-    "fromTopicStartOffsets": [{ "partition": 0, "offset": 234 }, { "partition": 1, "offset": 333 }],
-    "nodeUid": "oracle transform",
-    "orgUid": "cloudio",
-    "startDate": "2021-04-20T09:51:06.109358Z",
-    "toTopic": "data_2",
-    "version": 1,
-    "wfInstUid": "56b7c93b-996e-44db-923a-1b75aef76142",
-    "wfUid": "2c678365-b3f4-4194-b7ac-262e27c48379"
-  }
-  */
   protected void sendTaskStartResponse(TaskRequest taskRequest, String groupId) throws Exception {
 
     TaskStartResponse response = new TaskStartResponse();

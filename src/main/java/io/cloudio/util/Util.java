@@ -139,7 +139,6 @@ public class Util {
     consumerProps.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
     try (KafkaConsumer<String, String> list = new KafkaConsumer<>(consumerProps)) {
       // First, check if the topic exists in the list of all topics
-      // First, check if the topic exists in the list of all topics
       Map<String, List<PartitionInfo>> topics = list.listTopics();
       List<PartitionInfo> partitionInfos = topics.get(topicName);
       if (partitionInfos == null) {
@@ -234,11 +233,23 @@ public class Util {
   }
 
   public static String getBootstrapServer() {
+    return getProp("bootstrap.server");
+  }
+
+  private static String getProp(String property) {
     if (props == null) {
       Properties _props = loadProps();
       props = _props;
     }
-    return props.getProperty("bootstrap.server");
+    return props.getProperty(property);
+  }
+
+  public static String getInsatnceIdentifier() {
+    return UUID.randomUUID().toString();
+  }
+
+  public static String getWFEngineUrl() {
+    return getProp("wfengine.url");
   }
 
   private static Properties loadProps() {
@@ -450,10 +461,6 @@ public class Util {
     if (d == null) return "null";
     OffsetDateTime date = OffsetDateTime.ofInstant(d.toInstant(), ZoneOffset.systemDefault());
     return date.format(uformatter);
-  }
-
-  public static String getInsatnceIdentifier() {
-    return UUID.randomUUID().toString();
   }
 
 }

@@ -32,10 +32,6 @@ public abstract class OracleInputTask extends InputTask {
   public abstract Map<String, Object> executeTask(Map<String, Object> inputParams, Map<String, Object> outputParams,
       Map<String, Object> inputState) throws Exception;
 
-  public void start() throws Exception {
-    super.start();
-  }
-
   @Override
   public void handleData(TaskRequest taskRequest) throws Exception {
     boolean isError = false;
@@ -78,41 +74,6 @@ public abstract class OracleInputTask extends InputTask {
       d.put(fieldName, obj);
     }
     return d;
-  }
-
-  //read base url form io.properties
-  //wf/put
-  //wf/get
-
-  public <V> void put(String key, V value) {
-    //add unirest
-
-    // pass the token from taskrequest
-    // v.tostring() - 
-    // invoke rest api to store
-  }
-
-  public <V> V get(String key) {
-    return null;
-    // pass the token from taskrequest
-    // invoke rest api to get the data
-    // string -> V
-  }
-
-  public <V> void instancePut(String key, V value) {
-    // v.tostring() - 
-    // invoke rest api to store
-  }
-
-  public <V> V instanceGet(String key) {
-    return null;
-    // invoke rest api to get the data
-    // string -> V
-  }
-
-  @Override
-  public void handleData(List data) throws Exception {
-
   }
 
 }

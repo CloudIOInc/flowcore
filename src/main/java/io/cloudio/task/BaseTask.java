@@ -26,7 +26,11 @@ import io.cloudio.messages.TaskEndResponse;
 import io.cloudio.messages.TaskRequest;
 import io.cloudio.producer.Producer;
 import io.cloudio.task.Data.EventType;
+import io.cloudio.util.CloudIOException;
 import io.cloudio.util.Util;
+import kong.unirest.HttpResponse;
+import kong.unirest.JsonNode;
+import kong.unirest.Unirest;
 
 public abstract class BaseTask<K, V> {
   public static final String WF_EVENTS_TOPIC = "wf_events";
@@ -58,7 +62,9 @@ public abstract class BaseTask<K, V> {
 
   public abstract void handleEvent() throws Throwable;
 
-  public abstract void handleData(List<Data> data) throws Exception;
+  public void handleData(List<Data> data) throws Exception {
+
+  }
 
   void subscribeEvent() {
 
@@ -197,6 +203,70 @@ public abstract class BaseTask<K, V> {
 
   public void setSendStartResonse(boolean isSendResonse) {
     this.isSendStartResponse = isSendResonse;
+  }
+  //read base url form io.properties
+  //wf/put
+  //wf/get
+
+  public <V> void put(String key, V value) {
+    Map<String, Object> values = new HashMap<String, Object>();
+    values.put("key", key);
+    values.put("value", value);
+    HttpResponse<JsonNode> response = WFPost("/v1/wf/put", values);
+    handlePostError(response);
+  }
+
+  public <V> V get(String key) {
+    Map<String, Object> values = new HashMap<String, Object>();
+    values.put("key", key);
+    HttpResponse<JsonNode> response = WFPost("/v1/wf/get", values);
+    return handlePostValue(response);
+  }
+
+  public <V> void instancePut(String key, V value) {
+    Map<String, Object> values = new HashMap<String, Object>();
+    values.put("key", key);
+    values.put("value", value);
+    HttpResponse<JsonNode> response = WFPost(" /v1/wf/instancePut", values);
+    handlePostError(response);
+  }
+
+  public <V> V instanceGet(String key) {
+    Map<String, Object> values = new HashMap<String, Object>();
+    values.put("key", key);
+    HttpResponse<JsonNode> response = WFPost(" /v1/wf/instanceGet", values);
+    return handlePostValue(response);
+  }
+
+  private HttpResponse<JsonNode> WFPost(String method, Map<String, Object> values) {
+    populateWFRequest(values);
+    HttpResponse<JsonNode> response = Unirest.post(Util.getWFEngineUrl() + method)
+        .header("X-Application", "cloudio")
+        .header("Content-Type", "application/json")
+        .body(values)
+        .asJson();
+    return response;
+  }
+
+  private void populateWFRequest(Map<String, Object> values) {
+    values.put("token", taskRequest.getToken());
+    values.put("executionId", taskRequest.getExecutionId());
+    values.put("version", taskRequest.getVersion());
+    values.put("nodeUid", taskRequest.getNodeType());
+    values.put("wfInstUid", taskRequest.getWfInstUid());
+    values.put("wfUid", taskRequest.getWfUid());
+  }
+
+  private void handlePostError(HttpResponse<JsonNode> response) {
+    String status = response.getBody().getObject().getString("status");
+    if ("ERROR".equals(status)) {
+      throw new CloudIOException(status);
+    }
+  }
+
+  private <V> V handlePostValue(HttpResponse<JsonNode> response) {
+    handlePostError(response);
+    return (V) response.getBody().getObject().get("value");
   }
 
 }

@@ -101,42 +101,6 @@ public class DataConsumer extends Consumer<String, Data> {
     }
     this.baseTask.handleData(list);
   }
-  //
-  //  @Override
-  //  public void poll() throws Exception {
-  //    if (isClosing()) {
-  //      return;
-  //    }
-  //    ConsumerRecords<String, Data> records = consumer.poll(duration);
-  //    if (records.count() == 0) {
-  //      emptyCounter++;
-  //      if (emptyCounter > 10) {
-  //        error(CloudIOException.with(
-  //            "Got empty records for 10 polls before reaching the end offset {}!"));
-  //      }
-  //      if (duration.getSeconds() < 600) {
-  //        duration = duration.plusSeconds(duration.getSeconds());
-  //      }
-  //      if (duration.getSeconds() > 600) {
-  //        duration = Duration.ofSeconds(600);
-  //      }
-  //      updateProgress(emptyCounter, duration.getSeconds());
-  //      return;
-  //    } else {
-  //      emptyCounter = 0;
-  //      duration = initialDuration;
-  //      List<Data> list = new ArrayList<>(records.count());
-  //      for (ConsumerRecord<String, Data> record : records) {
-  //        Data data = record.value();
-  //        if (data == null) {
-  //          continue;
-  //        }
-  //        list.add(data);
-  //      }
-  //      this.baseTask.handleData(list);
-  //
-  //    }
-  //  }
 
   public void seek(TopicPartition tp, long offset) {
     consumer.seek(tp, offset);

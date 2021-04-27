@@ -141,7 +141,6 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable, Runnable {
         revoked.put(partition, offset);
       }
     });
-    boolean freeup = true;
     if (assigned.size() > 0) {
       try {
         commitSync(assigned);
@@ -149,7 +148,6 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable, Runnable {
           toBeCommitted.remove(tp);
         });
       } catch (RebalanceInProgressException e) {
-        freeup = false;
         logger.warn("{}: Deferring commit of assigned partitions {} due to RebalanceInProgressException!", getName(),
             this.tpCollectionToString(assigned.keySet()));
       } catch (Exception e) {
@@ -166,11 +164,9 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable, Runnable {
 
         });
       } catch (RebalanceInProgressException e) {
-        freeup = false;
         logger.warn("{}: Deferring commit of revoked partitions {} due to RebalanceInProgressException!", getName(),
             this.tpCollectionToString(revoked.keySet()));
       } catch (Exception e) {
-        // ignore
         revoked.forEach((tp, om) -> {
           toBeCommitted.remove(tp);
 
@@ -486,13 +482,11 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable, Runnable {
           logger.warn("{} --- onPartitionsAssigned: {}", getName(), tpCollectionToString(partitions));
           logger.warn("{} --- Current Assignments: {}", getName(), tpCollectionToString(consumer.assignment()));
         }
-        // StatusMonitor.onPartitionsAssigned(partitions);
         handleOnPartitionsAssigned(partitions);
       }
 
       @Override
       public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-        // if (!IOSystem.isShuttingDown()) {
         logger.warn("{} --- onPartitionsRevoked: {}", getName(), tpCollectionToString(partitions));
         logger.warn("{} --- Current Assignments: {}", getName(), tpCollectionToString(consumer.assignment()));
         // }
@@ -502,10 +496,6 @@ public abstract class BaseConsumer<K, V> implements AutoCloseable, Runnable {
       @Override
       public void onPartitionsLost(Collection<TopicPartition> partitions) {
         logger.info("{}: onPartitionsLost", getName());
-        //        if (!IOSystem.isShuttingDown()) {
-        //          logger.warn("{} --- onPartitionsLost: {}", getName(), tpCollectionToString(partitions));
-        //        }
-        //StatusMonitor.onPartitionsRevoked(partitions);
         handleOnPartitionsRevoked(partitions);
       }
     };

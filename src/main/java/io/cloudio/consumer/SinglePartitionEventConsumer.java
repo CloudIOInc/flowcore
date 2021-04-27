@@ -35,11 +35,9 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
   TopicPartition partition;
   long counter = 0;
   protected BaseTask<K, V> task;
-  private boolean initialized = false;
   private static final AtomicInteger CONSUMER_CLIENT_ID_SEQUENCE = new AtomicInteger(1);
   final Duration initialDuration = Duration.ofSeconds(1);
   Duration duration = initialDuration;
-  private boolean endOffsetReached = false;
   private int emptyCounter = 0;
 
   @Override
@@ -63,19 +61,11 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
 
   @Override
   public String getName() {
-    return "Single Partition - " + partition.toString();
+    return "Single Partition-" + topicNames.toString();
   }
 
   public void await() throws InterruptedException {
     countDownLatch.await();
-  }
-
-  protected void onComplete() {
-
-  }
-
-  protected void doFinally() {
-
   }
 
   @Override
@@ -87,11 +77,8 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
     ConsumerRecords<K, V> records = consumer.poll(duration);
     if (records.count() == 0) {
       emptyCounter++;
-      if (endOffsetReached) {
-        complete();
-      } else if (emptyCounter > 10) {
-        error(CloudIOException.with(
-            "Got empty records for 10 polls before reaching the end offset "));
+      if (emptyCounter % 10 == 0) {
+        logger.info("Got empty records for {} polls", emptyCounter);
       }
       if (duration.getSeconds() < 600) {
         duration = duration.plusSeconds(duration.getSeconds());
@@ -99,7 +86,6 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
       if (duration.getSeconds() > 600) {
         duration = Duration.ofSeconds(600);
       }
-      updateProgress(emptyCounter, duration.getSeconds());
       return;
     } else {
       emptyCounter = 0;
@@ -109,37 +95,19 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
     List<ConsumerRecord<K, V>> partitionRecords = records.records(partition);
 
     if (partitionRecords.size() > 0) {
-      // logger.info("found records: " + partitionRecords.size());
+      logger.info("found records: " + partitionRecords.size());
       try {
-        if (!initialized) {
-          initialized = true;
-          this.initialize(partition.topic());
-        }
-        this.startEventBatch(partition.topic(), partitionRecords);
-        // logger.info("before handleEvents");
         this.handleEvents(partition, partitionRecords);
-        // logger.info("after handleEvents");
-        this.endEventBatch(partition.topic(), partitionRecords);
       } catch (Throwable e) {
         logger.catching(e);
         error(e);
       }
-    }
-    if (endOffsetReached) {
-      complete();
-    }
-  }
-
-  protected void updateProgress(int emptyCounter, long seconds) {
-    if (logger.isDebugEnabled()) {
-      logger.debug("Got empty rows for {} polls. Will try again in {} seconds!", emptyCounter, seconds);
     }
   }
 
   public void error(Throwable e) {
     close();
     onError(e);
-    doFinally();
     countDownLatch.countDown();
   }
 
@@ -147,23 +115,9 @@ public abstract class SinglePartitionEventConsumer<K, V> extends Consumer<K, V> 
     logger.catching(e);
   }
 
-  protected void initialize(String topic) throws Exception {
-
-  }
-
   public final void complete() {
     close();
-    onComplete();
-    doFinally();
     countDownLatch.countDown();
-  }
-
-  protected void endEventBatch(String topic, List<ConsumerRecord<K, V>> partitionRecords) throws Exception {
-
-  }
-
-  protected void startEventBatch(String topic, List<ConsumerRecord<K, V>> partitionRecords) throws Exception {
-
   }
 
 }

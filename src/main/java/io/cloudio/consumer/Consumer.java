@@ -32,8 +32,6 @@ public class Consumer<K, V> extends BaseConsumer<K, V> {
     return topicNames.toString();
   }
 
-  //CHANGED : Return type changed to ConsumerRecords so that task will commit if 
-  //record handle is successful
   @Override
   public void poll() throws Throwable {
 

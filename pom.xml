@@ -9,12 +9,6 @@
 	<packaging>jar</packaging>
 	<name>ioflow</name>
 	<description>ioflow</description>
-	<!-- <parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>2.0.5.RELEASE</version>
-		<relativePath /> lookup parent from repository
-	</parent> -->
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -23,15 +17,11 @@
 		<kafka.version>2.5.0</kafka.version>
 	</properties>
 	<dependencies>
-		<!-- https://mvnrepository.com/artifact/org.springframework/spring-core -->
-		<!-- <dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-core</artifactId>
-			<version>5.2.13.RELEASE</version>
-		</dependency> -->
-
-		<!-- https://mvnrepository.com/artifact/org.springframework/spring-core -->
-
+		<dependency>
+			<groupId>com.konghq</groupId>
+			<artifactId>unirest-java</artifactId>
+			<version>2.2.00</version>
+		</dependency>
 		<dependency>
 			<groupId>com.google.code.gson</groupId>
 			<artifactId>gson</artifactId>
@@ -67,13 +57,13 @@
 			<artifactId>curator-test</artifactId>
 			<version>5.1.0</version>
 		</dependency>
-  		
+
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
 			<artifactId>log4j-slf4j-impl</artifactId>
 			<version>2.12.1</version>
 		</dependency>
-		
+
 	</dependencies>
 	<build>
 		<plugins>
@@ -87,7 +77,7 @@
 					<target>1.8</target>
 				</configuration>
 			</plugin>
-			
+
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
 				<executions>
@@ -106,26 +96,6 @@
 					<appendAssemblyId>false</appendAssemblyId>
 				</configuration>
 			</plugin>
-			
-			<!-- <plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<archive>
-						<manifestEntries>
-							<Build-Jdk>${jdk.version}</Build-Jdk>
-							<Implementation-Title>${project.name}</Implementation-Title>
-							<Implementation-Version>${project.version}</Implementation-Version>
-							<Specification-Title>${project.name} Library</Specification-Title>
-							<Specification-Version>${project.version}</Specification-Version>
-							<Class-Path>. libs/ojdbc8.jar</Class-Path>
-						</manifestEntries>
-						<manifest>
-							<addClasspath>true</addClasspath>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin> -->
 		</plugins>
 	</build>
 </project>

@@ -37,7 +37,6 @@ public class Producer extends KafkaProducer<String, Object> implements Transacti
   static final Object mutex = new Object();
   static final Deque<Producer> pool = new ArrayDeque<Producer>();
   static final List<Producer> openPool = new ArrayList<>();
-  boolean firstSend = true;
   private final long createdAt = System.currentTimeMillis();
 
   private static Producer verifyAndGet() {
@@ -255,10 +254,6 @@ public class Producer extends KafkaProducer<String, Object> implements Transacti
 
   @Override
   public Future<RecordMetadata> send(String topicName, String key, Object message) throws Exception {
-    if (firstSend) {
-      // logger.warn("Sending message w/ TxnId: {}", this.txnId);
-      firstSend = false;
-    }
     return send(new ProducerRecord<>(topicName, key, message));
   }
 

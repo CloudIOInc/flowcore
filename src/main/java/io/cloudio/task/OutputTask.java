@@ -34,7 +34,6 @@ public abstract class OutputTask<K, V> extends BaseTask<K, V> {
     dataConsumer = new DataConsumer(_id,
         Collections.singleton(taskRequest.getFromTopic()), (BaseTask<String, Data>) this, part, offset);
     dataConsumer.run();
-    // dataConsumer.seek(part, offset);
     dataConsumer.await();
     logger.info("Subscribing data event for output task - {}", _id);
   }
