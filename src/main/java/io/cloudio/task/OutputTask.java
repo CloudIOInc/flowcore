@@ -20,7 +20,7 @@ public abstract class OutputTask<K, V> extends BaseTask<K, V> {
   private static Logger logger = LogManager.getLogger(OutputTask.class);
   Producer producer;
 
-  OutputTask(String taskCode) {
+  public OutputTask(String taskCode) {
     super(taskCode);
   }
 
